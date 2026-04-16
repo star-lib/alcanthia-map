@@ -766,8 +766,27 @@ function currentMaxDistance() {
 }
 
 function expandToNextRing() {
-  const nextDistance = currentMaxDistance() + 1;
-  const targets = state.addSlots.filter(({ col, row }) => centerDistance(col, row) === nextDistance);
+  const cells = [...state.cells].map(parseKey);
+  const cols = cells.map(({ col }) => col);
+  const rows = cells.map(({ row }) => row);
+  const minCol = Math.min(...cols) - 1;
+  const maxCol = Math.max(...cols) + 1;
+  const minRow = Math.min(...rows) - 1;
+  const maxRow = Math.max(...rows) + 1;
+  const targets = [];
+
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      if ((col + row) % 2 !== 0) {
+        continue;
+      }
+
+      const key = cellKey(col, row);
+      if (!state.cells.has(key)) {
+        targets.push({ col, row });
+      }
+    }
+  }
 
   targets.forEach(({ col, row }) => {
     state.cells.add(cellKey(col, row));
