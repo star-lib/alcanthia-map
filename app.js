@@ -21,11 +21,12 @@ const CROPS = [
       "처음 1회만 물이 필요합니다.",
       "1회만 수확 가능한 작물입니다.",
     ],
+    hourlyYield: 0,
   },
   {
     id: "red-leaf",
-    name: "빨간 잎",
-    short: "잎",
+    name: "붉은꽃",
+    short: "붉",
     color: "#d63f3f",
     accentColor: "#ff8e8e",
     summary: "주기적 물 필요",
@@ -33,23 +34,12 @@ const CROPS = [
       "1칸 차지",
       "주기적으로 물이 필요한 작물입니다.",
     ],
-  },
-  {
-    id: "moss",
-    name: "이끼",
-    short: "끼",
-    color: "#2e9a90",
-    accentColor: "#7bd8c2",
-    summary: "첫 물 1회",
-    details: [
-      "1칸 차지",
-      "처음 1회만 물이 필요합니다.",
-    ],
+    hourlyYield: 240,
   },
   {
     id: "water-flower",
-    name: "물 꽃",
-    short: "물",
+    name: "이슬뿌리",
+    short: "이",
     color: "#76cfff",
     accentColor: "#d5f2ff",
     summary: "체비쇼프 2칸 물 공급",
@@ -58,10 +48,24 @@ const CROPS = [
       "체비쇼프 거리 2칸까지 항상 물을 공급합니다.",
       "물 공급 범위는 파란 오버레이로 표시됩니다.",
     ],
+    hourlyYield: 0,
+  },
+  {
+    id: "moss",
+    name: "푸른이끼",
+    short: "푸",
+    color: "#2e9a90",
+    accentColor: "#7bd8c2",
+    summary: "첫 물 1회",
+    details: [
+      "1칸 차지",
+      "처음 1회만 물이 필요합니다.",
+    ],
+    hourlyYield: 90,
   },
   {
     id: "poison-flower",
-    name: "독 꽃",
+    name: "독꽃",
     short: "독",
     color: "#7d49ba",
     accentColor: "#c89cf0",
@@ -72,23 +76,12 @@ const CROPS = [
       "대각선 인접 1칸 범위의 땅을 중독시킵니다.",
       "주기적으로 물이 필요합니다.",
     ],
-  },
-  {
-    id: "fire-flower",
-    name: "불 꽃",
-    short: "불",
-    color: "#e3481e",
-    accentColor: "#ffb347",
-    summary: "물 공급 시 사망",
-    details: [
-      "1칸 차지",
-      "물 공급을 받으면 즉시 죽는 작물입니다.",
-    ],
+    hourlyYield: 6,
   },
   {
     id: "mushroom",
-    name: "버섯",
-    short: "버",
+    name: "달빛버섯",
+    short: "달",
     color: "#fff8dd",
     accentColor: "#f1df8f",
     summary: "첫 물 1회, 1회 수확",
@@ -97,10 +90,11 @@ const CROPS = [
       "처음 1회만 물이 필요합니다.",
       "1회만 수확 가능한 작물입니다.",
     ],
+    hourlyYield: 0,
   },
   {
     id: "star-flower",
-    name: "별 꽃",
+    name: "별꽃",
     short: "별",
     color: "#7dbf3f",
     accentColor: "#f2da55",
@@ -109,11 +103,38 @@ const CROPS = [
       "1칸 차지",
       "주기적으로 물이 필요한 작물입니다.",
     ],
+    hourlyYield: 12,
+  },
+  {
+    id: "fire-flower",
+    name: "불씨덩굴",
+    short: "불",
+    color: "#e3481e",
+    accentColor: "#ffb347",
+    summary: "물 공급 시 사망",
+    details: [
+      "1칸 차지",
+      "물 공급을 받으면 즉시 죽는 작물입니다.",
+    ],
+    hourlyYield: 6,
+  },
+  {
+    id: "wind-flower",
+    name: "바람꽃",
+    short: "바",
+    color: "#cbefff",
+    accentColor: "#eefaff",
+    summary: "시간당 생산량 2",
+    details: [
+      "1칸 차지",
+      "고유 범위 효과는 없는 일반 생산 작물입니다.",
+    ],
+    hourlyYield: 2,
   },
   {
     id: "sun-flower",
-    name: "태양 꽃",
-    short: "양",
+    name: "햇살꽃",
+    short: "햇",
     color: "#f2c230",
     accentColor: "#fff09f",
     summary: "주기적 물 필요, 생산속도 +30%",
@@ -123,6 +144,7 @@ const CROPS = [
       "대각선 인접 1칸 범위의 생산 속도를 30% 올립니다.",
       "버프 범위는 금색 오버레이로 표시됩니다.",
     ],
+    hourlyYield: 0,
   },
 ];
 
@@ -137,6 +159,7 @@ const TOOLS = [
     details: [
       "밭 자체는 남겨두고 작물만 제거합니다.",
     ],
+    hourlyYield: 0,
   },
 ];
 
@@ -145,14 +168,23 @@ const cropById = new Map([...CROPS, ...TOOLS].map((crop) => [crop.id, crop]));
 const canvas = document.getElementById("field-canvas");
 const ctx = canvas.getContext("2d");
 const summary = document.getElementById("field-summary");
+const copyLayoutButton = document.getElementById("copy-layout-button");
 const expandRingButton = document.getElementById("expand-ring-button");
 const resetButton = document.getElementById("reset-button");
 const clearCropsButton = document.getElementById("clear-crops-button");
 const cropPalette = document.getElementById("crop-palette");
-const cropDetails = document.getElementById("crop-details");
 const slotTooltip = document.getElementById("slot-tooltip");
+const productionSummary = document.getElementById("production-summary");
+const productionGrid = document.getElementById("production-grid");
+const copyFeedback = document.getElementById("copy-feedback");
 
 const CENTER_CELL = { col: 3, row: 3 };
+const BASE_BOUNDS = {
+  minCol: 0,
+  maxCol: 6,
+  minRow: 0,
+  maxRow: 6,
+};
 
 const state = {
   cells: createStartingCells(),
@@ -176,6 +208,10 @@ const state = {
     dragging: false,
   },
 };
+
+let copyFeedbackTimeout = null;
+let resizeObserver = null;
+let lastDevicePixelRatio = window.devicePixelRatio || 1;
 
 function createStartingCells() {
   const cells = new Set();
@@ -215,17 +251,14 @@ function chebyshevDistance(a, b) {
   );
 }
 
-function centerDistance(col, row) {
-  return chebyshevDistance({ col, row }, CENTER_CELL);
+function borderLayer(col, row) {
+  const colGap = Math.max(BASE_BOUNDS.minCol - col, col - BASE_BOUNDS.maxCol, 0);
+  const rowGap = Math.max(BASE_BOUNDS.minRow - row, row - BASE_BOUNDS.maxRow, 0);
+  return Math.max(colGap, rowGap);
 }
 
-function expansionTier(distance) {
-  return Math.max(distance - 3, 0);
-}
-
-function expansionCostText(distance) {
-  const tier = expansionTier(distance);
-  return `${tier}강 마력결정 1개 + ${tier}강 각인석 1개`;
+function expansionCostText(layer) {
+  return `${layer}강 마력결정 1개 + ${layer}강 각인석 1개`;
 }
 
 function getDiagonalNeighbors(col, row) {
@@ -540,11 +573,44 @@ function getHoveredKey(kind) {
   return state.hover?.kind === kind ? state.hover.key : null;
 }
 
-function draw() {
+function paintCanvasBackground(targetCtx, width, height) {
+  targetCtx.save();
+  const radial = targetCtx.createRadialGradient(
+    width * 0.24,
+    height * 0.08,
+    20,
+    width * 0.24,
+    height * 0.08,
+    width * 0.55,
+  );
+  radial.addColorStop(0, "rgba(255, 255, 255, 0.62)");
+  radial.addColorStop(0.28, "rgba(255, 255, 255, 0.22)");
+  radial.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+  const linear = targetCtx.createLinearGradient(0, 0, 0, height);
+  linear.addColorStop(0, "#f4e4bd");
+  linear.addColorStop(1, "#e4d19f");
+
+  targetCtx.fillStyle = linear;
+  targetCtx.fillRect(0, 0, width, height);
+  targetCtx.fillStyle = radial;
+  targetCtx.fillRect(0, 0, width, height);
+  targetCtx.restore();
+}
+
+function draw(options = {}) {
+  const {
+    includeAddSlots = true,
+    includeCanvasBackground = false,
+  } = options;
+
   state.addSlots = collectAddSlots();
   const effects = buildEffectMap();
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (includeCanvasBackground) {
+    paintCanvasBackground(ctx, canvas.width, canvas.height);
+  }
   ctx.save();
   ctx.translate(state.view.offsetX, state.view.offsetY);
   ctx.scale(state.view.scale, state.view.scale);
@@ -579,33 +645,36 @@ function draw() {
     }
   }
 
-  state.addSlots.forEach(({ col, row }) => {
-    const key = cellKey(col, row);
-    const isHovered = getHoveredKey("add") === key;
-    const points = polygonForCell(col, row);
+  if (includeAddSlots) {
+    state.addSlots.forEach(({ col, row }) => {
+      const key = cellKey(col, row);
+      const isHovered = getHoveredKey("add") === key;
+      const points = polygonForCell(col, row);
 
-    drawDiamond(points, {
-      fill: isHovered ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.72)",
-      stroke: isHovered ? "rgba(211, 139, 56, 0.95)" : "rgba(66, 107, 52, 0.48)",
-      lineWidth: isHovered ? 3 : 2,
-      dash: [8, 6],
+      drawDiamond(points, {
+        fill: isHovered ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.72)",
+        stroke: isHovered ? "rgba(211, 139, 56, 0.95)" : "rgba(66, 107, 52, 0.48)",
+        lineWidth: isHovered ? 3 : 2,
+        dash: [8, 6],
+      });
+
+      const center = gridToPixel(col, row);
+      ctx.save();
+      ctx.fillStyle = isHovered ? "#d38b38" : "rgba(66, 107, 52, 0.72)";
+      ctx.font = `700 ${Math.round(CELL_SIZE * 0.72)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("+", center.x, center.y + 2);
+      ctx.restore();
     });
-
-    const center = gridToPixel(col, row);
-    ctx.save();
-    ctx.fillStyle = isHovered ? "#d38b38" : "rgba(66, 107, 52, 0.72)";
-    ctx.font = `700 ${Math.round(CELL_SIZE * 0.72)}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("+", center.x, center.y + 2);
-    ctx.restore();
-  });
+  }
 
   ctx.restore();
 
   const plantedCount = state.plants.size;
   summary.textContent = `총 ${state.cells.size}칸, 작물 ${plantedCount}개. 점선 칸은 확장, 밭 칸은 ${cropById.get(state.selectedCropId).name} 심기입니다.`;
   updateSlotTooltip();
+  renderProductionStats();
 }
 
 function resizeCanvas() {
@@ -620,6 +689,31 @@ function resizeCanvas() {
   canvas.style.height = `${displayHeight}px`;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   centerView();
+}
+
+function startCanvasResolutionWatcher() {
+  const syncIfNeeded = () => {
+    const currentRatio = window.devicePixelRatio || 1;
+    if (Math.abs(currentRatio - lastDevicePixelRatio) > 0.001) {
+      lastDevicePixelRatio = currentRatio;
+      resizeCanvas();
+    }
+  };
+
+  if ("ResizeObserver" in window) {
+    resizeObserver = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+    resizeObserver.observe(canvas.parentElement);
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncIfNeeded);
+  }
+
+  window.setInterval(syncIfNeeded, 300);
 }
 
 function pointInPolygon(point, polygon) {
@@ -715,29 +809,107 @@ function renderPalette() {
     button.className = `crop-button${crop.id === state.selectedCropId ? " active" : ""}`;
     button.dataset.cropId = crop.id;
     button.innerHTML = `
-      <i class="crop-swatch" style="background:linear-gradient(135deg, ${crop.accentColor ?? crop.color}, ${crop.color})"></i>
-      <span>
+      <span class="crop-button-top">
+        <i class="crop-swatch" style="background:linear-gradient(135deg, ${crop.accentColor ?? crop.color}, ${crop.color})"></i>
         <strong>${crop.name}</strong>
-        <span>${crop.summary}</span>
       </span>
+      <span class="crop-yield">시간당 ${crop.hourlyYield.toLocaleString("ko-KR")}개</span>
     `;
     button.addEventListener("click", () => {
       state.selectedCropId = crop.id;
       renderPalette();
-      renderCropDetails();
       draw();
     });
     cropPalette.appendChild(button);
   });
 }
 
-function renderCropDetails() {
-  const crop = cropById.get(state.selectedCropId);
-  cropDetails.innerHTML = `
-    <strong>${crop.name}</strong>
-    <p>${crop.summary}</p>
-    <ul>${crop.details.map((line) => `<li>${line}</li>`).join("")}</ul>
-  `;
+function renderProductionStats() {
+  const cropCounts = new Map(CROPS.map((crop) => [crop.id, 0]));
+  const effects = buildEffectMap();
+  const cropYieldTotals = new Map(CROPS.map((crop) => [crop.id, 0]));
+
+  for (const [key, cropId] of state.plants.entries()) {
+    if (cropCounts.has(cropId)) {
+      cropCounts.set(cropId, cropCounts.get(cropId) + 1);
+    }
+
+    const crop = cropById.get(cropId);
+    if (!crop || crop.hourlyYield <= 0) {
+      continue;
+    }
+
+    const effect = effects.get(key);
+    const buffMultiplier = effect && effect.sunBuff > 0 ? 1.3 : 1;
+    cropYieldTotals.set(
+      cropId,
+      cropYieldTotals.get(cropId) + crop.hourlyYield * buffMultiplier,
+    );
+  }
+
+  const totalYield = [...cropYieldTotals.values()].reduce((sum, value) => sum + value, 0);
+
+  productionSummary.textContent = `시간당 총 생산량 ${totalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
+
+  productionGrid.innerHTML = "";
+
+  CROPS.forEach((crop) => {
+    const count = cropCounts.get(crop.id) ?? 0;
+    const yieldTotal = cropYieldTotals.get(crop.id) ?? 0;
+    const card = document.createElement("article");
+    card.className = "production-card";
+    card.innerHTML = `
+      <strong>${crop.name}</strong>
+      <p>심은 개수: ${count}개</p>
+      <p>시간당 생산량: ${yieldTotal.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개</p>
+    `;
+    productionGrid.appendChild(card);
+  });
+}
+
+function showCopyFeedback(message, isError = false) {
+  copyFeedback.hidden = false;
+  copyFeedback.textContent = message;
+  copyFeedback.style.color = isError ? "#9f3e31" : "#6f6048";
+
+  if (copyFeedbackTimeout) {
+    clearTimeout(copyFeedbackTimeout);
+  }
+
+  copyFeedbackTimeout = window.setTimeout(() => {
+    copyFeedback.hidden = true;
+  }, 2400);
+}
+
+async function canvasToBlob(targetCanvas) {
+  return new Promise((resolve, reject) => {
+    targetCanvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("Canvas blob 생성에 실패했습니다."));
+      }
+    }, "image/png");
+  });
+}
+
+async function copyLayoutToClipboard() {
+  if (!navigator.clipboard || typeof ClipboardItem === "undefined") {
+    showCopyFeedback("이 브라우저에서는 이미지 클립보드 복사를 지원하지 않습니다.", true);
+    return;
+  }
+
+  try {
+    draw({ includeAddSlots: false, includeCanvasBackground: true });
+    const blob = await canvasToBlob(canvas);
+    const item = new ClipboardItem({ "image/png": blob });
+    await navigator.clipboard.write([item]);
+    showCopyFeedback("현재 밭 배치도를 클립보드에 복사했습니다.");
+  } catch (error) {
+    showCopyFeedback("복사에 실패했습니다. HTTPS 또는 localhost 환경인지 확인해 주세요.", true);
+  } finally {
+    draw();
+  }
 }
 
 function updateSlotTooltip() {
@@ -747,22 +919,15 @@ function updateSlotTooltip() {
   }
 
   const { col, row } = parseKey(state.hover.key);
-  const distance = centerDistance(col, row);
+  const layer = borderLayer(col, row);
   slotTooltip.innerHTML = `
     <strong>확장 비용</strong>
-    마름모 격자거리 ${distance}<br />
-    ${expansionCostText(distance)}
+    테두리 ${layer}단계 확장<br />
+    ${expansionCostText(layer)}
   `;
   slotTooltip.hidden = false;
   slotTooltip.style.left = `${Math.min(state.hoverPoint.x + 18, canvas.clientWidth - 220)}px`;
   slotTooltip.style.top = `${Math.min(state.hoverPoint.y + 18, canvas.clientHeight - 84)}px`;
-}
-
-function currentMaxDistance() {
-  return Math.max(...[...state.cells].map((key) => {
-    const { col, row } = parseKey(key);
-    return centerDistance(col, row);
-  }));
 }
 
 function expandToNextRing() {
@@ -919,7 +1084,7 @@ canvas.addEventListener("pointerup", (event) => {
   state.pointer.dragging = false;
   canvas.releasePointerCapture(event.pointerId);
 
-  if (!wasDragging) {
+  if (!wasDragging && event.button === 0) {
     applyClick(point);
   }
 
@@ -993,6 +1158,10 @@ clearCropsButton.addEventListener("click", () => {
   draw();
 });
 
+copyLayoutButton.addEventListener("click", () => {
+  copyLayoutToClipboard();
+});
+
 expandRingButton.addEventListener("click", () => {
   expandToNextRing();
 });
@@ -1039,15 +1208,12 @@ window.__planner_debug = {
     if (cropById.has(cropId)) {
       state.selectedCropId = cropId;
       renderPalette();
-      renderCropDetails();
       draw();
     }
   },
 };
 
-window.addEventListener("resize", resizeCanvas);
-
 renderPalette();
-renderCropDetails();
 draw();
 resizeCanvas();
+startCanvasResolutionWatcher();

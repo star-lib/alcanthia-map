@@ -124,43 +124,18 @@ body {
   flex-wrap: wrap;
 }
 
-.planner-layout {
-  display: grid;
-  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.crop-panel {
-  display: grid;
-  gap: 14px;
-}
-
-.panel-block {
-  padding: 16px;
-  border: 1px solid rgba(92, 66, 37, 0.12);
-  border-radius: 20px;
-  background: rgba(255, 250, 242, 0.78);
-}
-
-.panel-block h3 {
-  margin: 0 0 8px;
-  font-size: 1rem;
-}
-
-.panel-copy {
-  margin: 0 0 12px;
-  color: var(--text-soft);
-  font-size: 0.94rem;
-  line-height: 1.5;
-}
-
 .crop-palette {
   display: grid;
   gap: 8px;
+  margin-bottom: 14px;
+}
+
+.crop-palette.horizontal {
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
 }
 
 .crop-button,
+#copy-layout-button,
 #expand-ring-button,
 #reset-button,
 #clear-crops-button {
@@ -170,10 +145,11 @@ body {
 }
 
 .crop-button {
-  display: grid;
-  grid-template-columns: 18px 1fr;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
-  align-items: center;
+  min-height: 52px;
   padding: 12px 14px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.88);
@@ -187,16 +163,21 @@ body {
   box-shadow: 0 8px 24px rgba(211, 139, 56, 0.18);
 }
 
-.crop-button strong {
-  display: block;
-  font-size: 0.98rem;
+.crop-button-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.crop-button span {
+.crop-button strong {
   display: block;
-  margin-top: 2px;
+  font-size: 0.95rem;
+}
+
+.crop-yield {
   color: var(--text-soft);
-  font-size: 0.83rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
 }
 
 .crop-swatch {
@@ -207,12 +188,18 @@ body {
 }
 
 #reset-button,
+#copy-layout-button,
 #expand-ring-button,
 #clear-crops-button {
   border-radius: 999px;
   padding: 12px 18px;
   color: white;
   font-weight: 700;
+}
+
+#copy-layout-button {
+  background: #5967a8;
+  box-shadow: 0 10px 25px rgba(62, 74, 132, 0.22);
 }
 
 #expand-ring-button {
@@ -230,6 +217,7 @@ body {
   box-shadow: 0 10px 25px rgba(84, 92, 46, 0.2);
 }
 
+#copy-layout-button:hover,
 #expand-ring-button:hover,
 #reset-button:hover,
 #clear-crops-button:hover {
@@ -253,11 +241,6 @@ body {
     linear-gradient(180deg, #f4e4bd, #e4d19f);
 }
 
-.hint {
-  margin: 14px 4px 0;
-  color: var(--text-soft);
-}
-
 .slot-tooltip {
   position: absolute;
   top: 14px;
@@ -278,33 +261,61 @@ body {
   margin-bottom: 4px;
 }
 
-.crop-details {
-  min-height: 120px;
-  color: var(--text-soft);
-  line-height: 1.55;
+.stats-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(92, 66, 37, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 250, 242, 0.78);
 }
 
-.crop-details strong {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--text-main);
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stats-header h3 {
+  margin: 0;
   font-size: 1rem;
 }
 
-.crop-details p {
-  margin: 0 0 8px;
-}
-
-.crop-details ul,
-.help-list {
+.stats-header p {
   margin: 0;
-  padding-left: 18px;
   color: var(--text-soft);
 }
 
-.crop-details li,
-.help-list li {
+.production-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.production-card {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(92, 66, 37, 0.12);
+}
+
+.production-card strong {
+  display: block;
   margin-bottom: 6px;
+}
+
+.production-card p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.copy-feedback {
+  margin: 12px 0 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
 }
 
 @media (max-width: 720px) {
@@ -323,14 +334,16 @@ body {
     align-items: flex-start;
   }
 
-  .planner-layout {
-    grid-template-columns: 1fr;
-  }
-
   .toolbar-actions {
     width: 100%;
   }
 
+  .stats-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #copy-layout-button,
   #expand-ring-button,
   #clear-crops-button,
   #reset-button {
