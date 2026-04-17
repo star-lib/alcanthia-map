@@ -42,11 +42,13 @@
           <div id="slot-tooltip" class="slot-tooltip" hidden></div>
         </div>
         <section class="stats-panel">
-          <div class="stats-header">
-            <h3>생산 현황</h3>
-            <p id="production-summary">집계 계산 중...</p>
+          <button id="toggle-stats-button" class="stats-toggle" type="button" aria-expanded="true">
+            <span class="stats-title">생산 현황</span>
+            <span id="production-summary">집계 계산 중...</span>
+          </button>
+          <div id="stats-content" class="stats-content">
+            <div id="production-grid" class="production-grid"></div>
           </div>
-          <div id="production-grid" class="production-grid"></div>
           <p id="copy-feedback" class="copy-feedback" hidden></p>
         </section>
         <p class="site-note">

@@ -226,7 +226,9 @@ const resetButton = document.getElementById("reset-button");
 const clearCropsButton = document.getElementById("clear-crops-button");
 const cropPalette = document.getElementById("crop-palette");
 const slotTooltip = document.getElementById("slot-tooltip");
+const toggleStatsButton = document.getElementById("toggle-stats-button");
 const productionSummary = document.getElementById("production-summary");
+const statsContent = document.getElementById("stats-content");
 const productionGrid = document.getElementById("production-grid");
 const copyFeedback = document.getElementById("copy-feedback");
 
@@ -246,7 +248,8 @@ const state = {
   hover: null,
   hoverPoint: null,
   selectedCropId: CROPS[0].id,
-  panLocked: false,
+  panLocked: true,
+  statsCollapsed: window.matchMedia("(max-width: 720px)").matches,
   view: {
     scale: 1,
     offsetX: 0,
@@ -269,6 +272,7 @@ const state = {
 let copyFeedbackTimeout = null;
 let resizeObserver = null;
 let lastDevicePixelRatio = window.devicePixelRatio || 1;
+let lastCompactViewport = window.matchMedia("(max-width: 720px)").matches;
 
 function createStartingCells() {
   const cells = new Set();
@@ -757,8 +761,11 @@ function draw(options = {}) {
 function resizeCanvas() {
   const ratio = window.devicePixelRatio || 1;
   const wrap = canvas.parentElement;
+  const compactViewport = window.matchMedia("(max-width: 720px)").matches;
   const displayWidth = Math.max(320, Math.floor(wrap.clientWidth));
-  const displayHeight = Math.max(560, Math.round(displayWidth * 0.72));
+  const displayHeight = compactViewport
+    ? displayWidth
+    : Math.max(560, Math.round(displayWidth * 0.72));
 
   canvas.width = Math.round(displayWidth * ratio);
   canvas.height = Math.round(displayHeight * ratio);
@@ -887,10 +894,14 @@ function renderPalette() {
     button.dataset.cropId = crop.id;
     button.innerHTML = `
       <span class="crop-button-top">
-        <i class="crop-swatch" style="background:linear-gradient(135deg, ${crop.accentColor ?? crop.color}, ${crop.color})"></i>
-        <strong>${crop.name}</strong>
+        <span class="crop-swatch" style="background:linear-gradient(135deg, ${crop.accentColor ?? crop.color}, ${crop.color})">
+          <span class="crop-swatch-text">${crop.short}</span>
+        </span>
+        <span class="crop-button-label">
+          <strong>${crop.name}</strong>
+          <span class="crop-yield">시간당 ${crop.hourlyYield.toLocaleString("ko-KR")}개</span>
+        </span>
       </span>
-      <span class="crop-yield">시간당 ${crop.hourlyYield.toLocaleString("ko-KR")}개</span>
     `;
     button.addEventListener("click", () => {
       state.selectedCropId = crop.id;
@@ -1025,6 +1036,21 @@ async function copyLayoutToClipboard() {
 function renderPanLockButton() {
   togglePanLockButton.textContent = state.panLocked ? "이동 잠김" : "이동 가능";
   togglePanLockButton.classList.toggle("locked", state.panLocked);
+}
+
+function renderStatsPanel() {
+  toggleStatsButton.setAttribute("aria-expanded", String(!state.statsCollapsed));
+  statsContent.hidden = state.statsCollapsed;
+}
+
+function syncResponsivePanels() {
+  const compactViewport = window.matchMedia("(max-width: 720px)").matches;
+
+  if (compactViewport !== lastCompactViewport) {
+    state.statsCollapsed = compactViewport;
+    lastCompactViewport = compactViewport;
+    renderStatsPanel();
+  }
 }
 
 function updateSlotTooltip() {
@@ -1349,6 +1375,11 @@ togglePanLockButton.addEventListener("click", () => {
   canvas.style.cursor = state.panLocked ? "default" : "grab";
 });
 
+toggleStatsButton.addEventListener("click", () => {
+  state.statsCollapsed = !state.statsCollapsed;
+  renderStatsPanel();
+});
+
 expandRingButton.addEventListener("click", () => {
   expandToNextRing();
 });
@@ -1405,6 +1436,8 @@ window.__planner_debug = {
 
 renderPalette();
 renderPanLockButton();
+renderStatsPanel();
 draw();
 resizeCanvas();
 startCanvasResolutionWatcher();
+window.addEventListener("resize", syncResponsivePanels);
