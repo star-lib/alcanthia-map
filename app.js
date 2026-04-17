@@ -243,7 +243,7 @@ const slotPanel = document.createElement("section");
 slotPanel.className = "slot-panel";
 slotPanel.innerHTML = `
   <div class="slot-panel-header">
-    <h3>배치 슬롯</h3>
+    <h3>밭 저장하기</h3>
     <p>최대 10개 저장</p>
   </div>
   <div id="slot-list" class="slot-list"></div>
