@@ -235,7 +235,7 @@ const copyFeedback = document.getElementById("copy-feedback");
 const shareLayoutButton = document.createElement("button");
 shareLayoutButton.id = "share-layout-button";
 shareLayoutButton.type = "button";
-shareLayoutButton.textContent = "링크 공유";
+shareLayoutButton.textContent = "밭 공유";
 toolbarActions.insertBefore(shareLayoutButton, expandRingButton);
 
 const STORAGE_KEY = "alchansia-layout-v1";
@@ -391,6 +391,22 @@ function loadLayoutFromUrl() {
   } catch (error) {
     return false;
   }
+}
+
+function applySharedLayoutFromCurrentUrl(showMessage = false) {
+  const loaded = loadLayoutFromUrl();
+  if (!loaded) {
+    return false;
+  }
+
+  renderPalette();
+  centerView();
+
+  if (showMessage) {
+    showCopyFeedback("공유 링크 배치를 불러왔습니다.");
+  }
+
+  return true;
 }
 
 function saveLayoutToStorage() {
@@ -1137,7 +1153,7 @@ async function copyLayoutToClipboard() {
     const blob = await canvasToBlob(canvas);
     const item = new ClipboardItem({ "image/png": blob });
     await navigator.clipboard.write([item]);
-    showCopyFeedback("현재 밭 배치도를 캡쳐해 클립보드에 저장했습니다.");
+    showCopyFeedback("복사 완료");
   } catch (error) {
     showCopyFeedback("캡쳐에 실패했습니다. HTTPS 또는 localhost 환경인지 확인해 주세요.", true);
   } finally {
@@ -1150,7 +1166,7 @@ async function copyShareLink() {
 
   try {
     await navigator.clipboard.writeText(shareUrl);
-    showCopyFeedback("현재 배치 공유 링크를 클립보드에 저장했습니다.");
+    showCopyFeedback("복사 완료");
   } catch (error) {
     showCopyFeedback("공유 링크 복사에 실패했습니다.", true);
   }
@@ -1572,6 +1588,7 @@ const loadedSharedLayout = loadLayoutFromUrl();
 if (!loadedSharedLayout) {
   loadLayoutFromStorage();
 }
+copyLayoutButton.textContent = "캡쳐";
 renderPalette();
 renderPanLockButton();
 renderStatsPanel();
@@ -1579,6 +1596,9 @@ draw();
 resizeCanvas();
 startCanvasResolutionWatcher();
 window.addEventListener("resize", syncResponsivePanels);
+window.addEventListener("hashchange", () => {
+  applySharedLayoutFromCurrentUrl(true);
+});
 
 if (loadedSharedLayout) {
   showCopyFeedback("공유 링크 배치를 불러왔습니다.");
