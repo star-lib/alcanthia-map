@@ -391,6 +391,17 @@ function currentShareUrl() {
   return url.toString();
 }
 
+function updateUrlWithCurrentLayout() {
+  window.history.replaceState(null, "", currentShareUrl());
+}
+
+function clearSharedLayoutFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(SHARE_PARAM);
+  url.hash = "";
+  window.history.replaceState(null, "", url.toString());
+}
+
 function loadLayoutFromUrl() {
   try {
     const url = new URL(window.location.href);
@@ -1315,7 +1326,8 @@ async function copyLayoutToClipboard() {
 }
 
 async function copyShareLink() {
-  const shareUrl = currentShareUrl();
+  updateUrlWithCurrentLayout();
+  const shareUrl = window.location.href;
 
   try {
     await navigator.clipboard.writeText(shareUrl);
@@ -1693,6 +1705,7 @@ resetButton.addEventListener("click", () => {
   state.hover = null;
   state.hoverPoint = null;
   saveLayoutToStorage();
+  clearSharedLayoutFromUrl();
   centerView();
 });
 
