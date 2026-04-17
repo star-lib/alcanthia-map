@@ -40,8 +40,8 @@ const CROPS = [
     id: "water-flower",
     name: "이슬뿌리",
     short: "이",
-    color: "#76cfff",
-    accentColor: "#d5f2ff",
+    color: "#4aa8e8",
+    accentColor: "#9fd8ff",
     summary: "체비쇼프 2칸 물 공급",
     details: [
       "1칸 차지",
@@ -132,6 +132,32 @@ const CROPS = [
     hourlyYield: 2,
   },
   {
+    id: "phantom-fern",
+    name: "환영고사리",
+    short: "환",
+    color: "#78b48d",
+    accentColor: "#c9f0da",
+    summary: "시간당 생산량 7.5",
+    details: [
+      "1칸 차지",
+      "주변 4칸의 서로 다른 식물 수에 따라 생산량이 증가합니다.",
+    ],
+    hourlyYield: 7.5,
+  },
+  {
+    id: "sunset-tree",
+    name: "노을목",
+    short: "노",
+    color: "#c87442",
+    accentColor: "#f2bb7d",
+    summary: "시간당 생산량 6",
+    details: [
+      "1칸 차지",
+      "고유 범위 효과는 없는 일반 생산 작물입니다.",
+    ],
+    hourlyYield: 6,
+  },
+  {
     id: "sun-flower",
     name: "햇살꽃",
     short: "햇",
@@ -150,14 +176,39 @@ const CROPS = [
 
 const TOOLS = [
   {
-    id: "erase",
-    name: "지우개",
-    short: "X",
+    id: "erase-plant",
+    name: "식물 지우개",
+    short: "식",
     color: "#888888",
     accentColor: "#d4d4d4",
-    summary: "심어진 작물 제거",
+    summary: "심어진 식물 제거",
     details: [
-      "밭 자체는 남겨두고 작물만 제거합니다.",
+      "밭은 남겨두고 심어진 식물만 제거합니다.",
+    ],
+    hourlyYield: 0,
+  },
+  {
+    id: "erase-tile",
+    name: "땅 지우개",
+    short: "땅",
+    color: "#6f6048",
+    accentColor: "#b7a27d",
+    summary: "밭 타일 제거",
+    details: [
+      "선택한 밭 타일 자체를 제거합니다.",
+    ],
+    hourlyYield: 0,
+  },
+  {
+    id: "desertify",
+    name: "사막화",
+    short: "사",
+    color: "#b78945",
+    accentColor: "#e0bd79",
+    summary: "물 공급 차단 땅 속성",
+    details: [
+      "선택한 땅에 사막화 속성을 추가하거나 제거합니다.",
+      "사막화된 땅은 이슬뿌리 범위 안이어도 물을 받지 않습니다.",
     ],
     hourlyYield: 0,
   },
@@ -191,6 +242,7 @@ const state = {
   cells: createStartingCells(),
   addSlots: [],
   plants: new Map(),
+  desertTiles: new Set(),
   hover: null,
   hoverPoint: null,
   selectedCropId: CROPS[0].id,
@@ -405,7 +457,10 @@ function buildEffectMap() {
     if (crop.id === "water-flower") {
       for (const cell of state.cells) {
         const target = parseKey(cell);
-        if (chebyshevDistance(origin, target) <= 2) {
+        if (
+          chebyshevDistance(origin, target) <= 2 &&
+          !state.desertTiles.has(cell)
+        ) {
           effects.get(cell).watered += 1;
         }
       }
@@ -627,6 +682,7 @@ function draw(options = {}) {
     const points = polygonForCell(col, row);
     const effect = effects.get(key);
     const isHovered = getHoveredKey("cell") === key;
+    const isDesert = state.desertTiles.has(key);
 
     drawDiamond(points, {
       fill: isHovered ? "rgba(218, 180, 113, 0.98)" : "rgba(202, 161, 100, 0.96)",
@@ -643,6 +699,22 @@ function draw(options = {}) {
     ctx.ellipse(center.x - 8, center.y - 10, 16, 9, -0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+
+    if (isDesert) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(130, 83, 31, 0.72)";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(center.x - 16, center.y - 3);
+      ctx.lineTo(center.x - 3, center.y - 10);
+      ctx.lineTo(center.x + 5, center.y - 2);
+      ctx.lineTo(center.x + 16, center.y - 9);
+      ctx.moveTo(center.x - 10, center.y + 8);
+      ctx.lineTo(center.x - 1, center.y + 2);
+      ctx.lineTo(center.x + 11, center.y + 10);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     const cropId = state.plants.get(key);
     if (cropId) {
@@ -844,8 +916,7 @@ function renderProductionStats() {
       continue;
     }
 
-    const effect = effects.get(key);
-    const buffMultiplier = effect && effect.sunBuff > 0 ? 1.3 : 1;
+    const buffMultiplier = getProductionMultiplier(key, cropId, effects);
     cropYieldTotals.set(
       cropId,
       cropYieldTotals.get(cropId) + crop.hourlyYield * buffMultiplier,
@@ -870,6 +941,40 @@ function renderProductionStats() {
     `;
     productionGrid.appendChild(card);
   });
+}
+
+function getNeighborPlantIds(key) {
+  const { col, row } = parseKey(key);
+  return getDiagonalNeighbors(col, row)
+    .map(({ col: neighborCol, row: neighborRow }) => state.plants.get(cellKey(neighborCol, neighborRow)))
+    .filter(Boolean);
+}
+
+function getOvercrowdingMultiplier(sameNeighborCount) {
+  const factors = [1, 0.5, 0.25, 0.16, 0.06];
+  return factors[Math.min(sameNeighborCount, 4)];
+}
+
+function getProductionMultiplier(key, cropId, effects) {
+  const effect = effects.get(key);
+  const neighborPlantIds = getNeighborPlantIds(key);
+  const sameNeighborCount = neighborPlantIds.filter((id) => id === cropId).length;
+  let multiplier = getOvercrowdingMultiplier(sameNeighborCount);
+
+  if (effect && effect.sunBuff > 0) {
+    multiplier *= 1.3;
+  }
+
+  if (cropId === "moss" && effect && effect.watered > 0) {
+    multiplier *= 2;
+  }
+
+  if (cropId === "phantom-fern") {
+    const uniqueNeighborPlantCount = new Set(neighborPlantIds).size;
+    multiplier *= Math.max(1, Math.min(uniqueNeighborPlantCount, 4));
+  }
+
+  return multiplier;
 }
 
 function showCopyFeedback(message, isError = false) {
@@ -1020,8 +1125,21 @@ function applyClick(point) {
     return;
   }
 
-  if (state.selectedCropId === "erase") {
+  if (state.selectedCropId === "erase-plant") {
     state.plants.delete(cell.key);
+  } else if (state.selectedCropId === "erase-tile") {
+    state.cells.delete(cell.key);
+    state.plants.delete(cell.key);
+    state.desertTiles.delete(cell.key);
+    if (state.cells.size === 0) {
+      state.cells = createStartingCells();
+    }
+  } else if (state.selectedCropId === "desertify") {
+    if (state.desertTiles.has(cell.key)) {
+      state.desertTiles.delete(cell.key);
+    } else {
+      state.desertTiles.add(cell.key);
+    }
   } else {
     const existingCropId = state.plants.get(cell.key);
     if (existingCropId === state.selectedCropId) {
@@ -1199,6 +1317,7 @@ canvas.addEventListener("contextmenu", (event) => {
 
   state.cells.delete(cell.key);
   state.plants.delete(cell.key);
+  state.desertTiles.delete(cell.key);
 
   for (const [key] of state.plants) {
     if (!state.cells.has(key)) {
@@ -1237,6 +1356,7 @@ expandRingButton.addEventListener("click", () => {
 resetButton.addEventListener("click", () => {
   state.cells = createStartingCells();
   state.plants.clear();
+  state.desertTiles.clear();
   state.hover = null;
   state.hoverPoint = null;
   centerView();
@@ -1252,6 +1372,7 @@ window.render_game_to_text = () =>
       ...parseKey(key),
       cropId,
     })),
+    desertTiles: [...state.desertTiles].map(parseKey),
     expandableSlots: state.addSlots,
   });
 
@@ -1268,6 +1389,7 @@ window.__planner_debug = {
       ...parseKey(key),
       cropId,
     })),
+  getDesertTiles: () => [...state.desertTiles].map(parseKey),
   gridToScreen: (col, row) => {
     const center = gridToPixel(col, row);
     return worldToScreen(center.x, center.y);
