@@ -382,6 +382,37 @@ body {
   margin-top: 12px;
 }
 
+.boost-potion-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid rgba(92, 66, 37, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+#boost-potion-button {
+  min-width: 48px;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: #8e7b62;
+  color: #fffaf2;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+#boost-potion-button.active {
+  background: #d38b38;
+  box-shadow: 0 8px 18px rgba(211, 139, 56, 0.24);
+}
+
 .stats-content[hidden] {
   display: none;
 }

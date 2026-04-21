@@ -248,6 +248,14 @@ const toggleStatsButton = document.getElementById("toggle-stats-button");
 const productionSummary = document.getElementById("production-summary");
 const statsContent = document.getElementById("stats-content");
 const productionGrid = document.getElementById("production-grid");
+const boostPotionControl = document.createElement("label");
+boostPotionControl.className = "boost-potion-toggle";
+boostPotionControl.innerHTML = `
+  <span>촉진포션</span>
+  <button id="boost-potion-button" type="button" aria-pressed="false">Off</button>
+`;
+statsContent.insertBefore(boostPotionControl, productionGrid);
+const boostPotionButton = document.getElementById("boost-potion-button");
 const copyFeedback = document.getElementById("copy-feedback");
 const plannerCard = document.querySelector(".planner-card");
 const siteNote = document.querySelector(".site-note");
@@ -303,6 +311,7 @@ const state = {
   hoverPoint: null,
   activeTab: "planner",
   selectedCropId: CROPS[0].id,
+  boostPotionActive: false,
   panLocked: true,
   statsCollapsed: window.matchMedia("(max-width: 720px)").matches,
   view: {
@@ -1690,8 +1699,12 @@ function renderProductionStats() {
   }
 
   const totalYield = [...cropYieldTotals.values()].reduce((sum, value) => sum + value, 0);
+  const displayedTotalYield = state.boostPotionActive ? totalYield * 1.5 : totalYield;
 
-  productionSummary.textContent = `시간당 총 생산량 ${totalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
+  productionSummary.textContent = `시간당 총 생산량 ${displayedTotalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
+  if (state.boostPotionActive) {
+    productionSummary.textContent += " (촉진포션 On)";
+  }
 
   productionGrid.innerHTML = "";
 
@@ -1808,6 +1821,12 @@ function renderPanLockButton() {
 function renderStatsPanel() {
   toggleStatsButton.setAttribute("aria-expanded", String(!state.statsCollapsed));
   statsContent.hidden = state.statsCollapsed;
+}
+
+function renderBoostPotionButton() {
+  boostPotionButton.textContent = state.boostPotionActive ? "On" : "Off";
+  boostPotionButton.setAttribute("aria-pressed", String(state.boostPotionActive));
+  boostPotionButton.classList.toggle("active", state.boostPotionActive);
 }
 
 function syncResponsivePanels() {
@@ -2175,6 +2194,12 @@ toggleStatsButton.addEventListener("click", () => {
   renderStatsPanel();
 });
 
+boostPotionButton.addEventListener("click", () => {
+  state.boostPotionActive = !state.boostPotionActive;
+  renderBoostPotionButton();
+  renderProductionStats();
+});
+
 expandRingButton.addEventListener("click", () => {
   expandToNextRing();
 });
@@ -2241,6 +2266,7 @@ setActiveTab("planner");
 renderPalette();
 renderPanLockButton();
 renderStatsPanel();
+renderBoostPotionButton();
 renderLayoutSlots();
 renderRecipeCalculator();
 draw();
