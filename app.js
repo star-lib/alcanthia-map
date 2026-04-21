@@ -215,6 +215,21 @@ const TOOLS = [
 ];
 
 const cropById = new Map([...CROPS, ...TOOLS].map((crop) => [crop.id, crop]));
+const CAULDRON_TIERS = [
+  { id: "gold", name: "금 가마솥", icon: "금", iconClass: "gold" },
+  { id: "silver", name: "은 가마솥", icon: "은", iconClass: "silver" },
+  { id: "copper", name: "동 가마솥", icon: "동", iconClass: "copper" },
+];
+const CROP_PRODUCTION_MATERIALS = {
+  "red-leaf": "붉은꽃잎",
+  moss: "푸른이끼",
+  "poison-flower": "독꽃잎",
+  "star-flower": "별꽃가루",
+  "fire-flower": "불씨열매",
+  "wind-flower": "바람꽃잎",
+  "phantom-fern": "환영잎",
+  "sunset-tree": "노을잎",
+};
 
 const canvas = document.getElementById("field-canvas");
 const ctx = canvas.getContext("2d");
@@ -226,6 +241,11 @@ const expandRingButton = document.getElementById("expand-ring-button");
 const resetButton = document.getElementById("reset-button");
 const clearCropsButton = document.getElementById("clear-crops-button");
 const cropPalette = document.getElementById("crop-palette");
+const canvasActions = document.createElement("div");
+canvasActions.className = "canvas-actions";
+canvasActions.setAttribute("aria-label", "밭 조작");
+cropPalette.insertAdjacentElement("afterend", canvasActions);
+canvasActions.append(togglePanLockButton, expandRingButton, clearCropsButton, resetButton);
 const paletteDock = document.createElement("div");
 paletteDock.className = "palette-dock";
 const toolSection = document.createElement("section");
@@ -263,7 +283,12 @@ const shareLayoutButton = document.createElement("button");
 shareLayoutButton.id = "share-layout-button";
 shareLayoutButton.type = "button";
 shareLayoutButton.textContent = "밭 공유";
-toolbarActions.insertBefore(shareLayoutButton, expandRingButton);
+toolbarActions.appendChild(shareLayoutButton);
+const openLayoutSlotsButton = document.createElement("button");
+openLayoutSlotsButton.id = "layout-slots-button";
+openLayoutSlotsButton.type = "button";
+openLayoutSlotsButton.textContent = "저장/불러오기";
+toolbarActions.appendChild(openLayoutSlotsButton);
 const slotPanel = document.createElement("section");
 slotPanel.className = "slot-panel";
 slotPanel.innerHTML = `
@@ -275,9 +300,25 @@ slotPanel.innerHTML = `
 `;
 plannerCard.insertBefore(slotPanel, siteNote);
 const slotList = document.getElementById("slot-list");
+slotPanel.classList.add("slot-modal");
+const slotPanelCloseButton = document.createElement("button");
+slotPanelCloseButton.type = "button";
+slotPanelCloseButton.className = "slot-modal-close";
+slotPanelCloseButton.dataset.action = "close-slot-dialog";
+slotPanelCloseButton.textContent = "닫기";
+slotPanel.querySelector(".slot-panel-header").appendChild(slotPanelCloseButton);
+slotPanel.hidden = true;
+document.body.appendChild(slotPanel);
+const slotModalBackdrop = document.createElement("button");
+slotModalBackdrop.type = "button";
+slotModalBackdrop.className = "slot-modal-backdrop";
+slotModalBackdrop.setAttribute("aria-label", "저장/불러오기 닫기");
+slotModalBackdrop.hidden = true;
+document.body.appendChild(slotModalBackdrop);
 const tabButtons = [...document.querySelectorAll(".tab-button")];
 const plannerView = document.getElementById("planner-view");
 const calculatorView = document.getElementById("calculator-view");
+const materialsView = document.getElementById("materials-view");
 const recipeTargetSelect = document.getElementById("recipe-target-select");
 const recipeTargetLevelInput = document.getElementById("recipe-target-level");
 const recipeTargetCountInput = document.getElementById("recipe-target-count");
@@ -285,9 +326,20 @@ const recipeControls = document.getElementById("recipe-controls");
 const recipeSummary = document.getElementById("recipe-summary");
 const recipeBreakdown = document.getElementById("recipe-breakdown");
 const recipeList = document.getElementById("recipe-list");
+const cauldronBoard = document.getElementById("cauldron-board");
+const materialUsageSummary = document.getElementById("material-usage-summary");
+const openCauldronSlotsButton = document.createElement("button");
+openCauldronSlotsButton.id = "cauldron-slots-button";
+openCauldronSlotsButton.className = "slot-open-button";
+openCauldronSlotsButton.type = "button";
+openCauldronSlotsButton.textContent = "저장/불러오기";
+cauldronBoard.before(openCauldronSlotsButton);
 
 const STORAGE_KEY = "alchansia-layout-v1";
 const SLOT_STORAGE_KEY = "alchansia-layout-slots-v1";
+const CALCULATOR_STORAGE_KEY = "alchansia-calculator-v1";
+const MATERIAL_STORAGE_KEY = "alchansia-materials-v1";
+const CAULDRON_SLOT_STORAGE_KEY = "alchansia-cauldron-slots-v1";
 const SHARE_PARAM = "layout";
 const MAX_LAYOUT_SLOTS = 10;
 const ENHANCE_EXPECTED_COST = 3;
@@ -305,7 +357,11 @@ const state = {
   plants: new Map(),
   desertTiles: new Set(),
   layoutSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
+  cauldronSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
+  activeSlotMode: "layout",
   recipes: [],
+  potionRecipes: [],
+  cauldrons: Object.fromEntries(CAULDRON_TIERS.map((tier) => [tier.id, []])),
   recipeSelections: new Map(),
   hover: null,
   hoverPoint: null,
@@ -523,6 +579,103 @@ function loadLayoutSlotsFromStorage() {
   }
 }
 
+function currentCauldronPayload() {
+  return Object.fromEntries(
+    CAULDRON_TIERS.map((tier) => [
+      tier.id,
+      state.cauldrons[tier.id].map((cauldron) => ({
+        id: cauldron.id,
+        level: Math.max(0, Number(cauldron.level) || 0),
+        recipeValue: cauldron.recipeValue || defaultCauldronRecipeValue(),
+      })),
+    ]),
+  );
+}
+
+function applyCauldronPayload(payload) {
+  CAULDRON_TIERS.forEach((tier) => {
+    const items = Array.isArray(payload?.[tier.id]) ? payload[tier.id] : [];
+    state.cauldrons[tier.id] = items.map((item) => ({
+      id: typeof item.id === "string" ? item.id : `${tier.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      level: Math.max(0, Math.min(20, Number(item.level) || 0)),
+      recipeValue: typeof item.recipeValue === "string" ? item.recipeValue : defaultCauldronRecipeValue(),
+    }));
+  });
+}
+
+function saveCauldronStateToStorage() {
+  try {
+    window.localStorage.setItem(MATERIAL_STORAGE_KEY, JSON.stringify(currentCauldronPayload()));
+  } catch (error) {
+    // Ignore storage errors so the calculator remains usable.
+  }
+}
+
+function loadCauldronStateFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(MATERIAL_STORAGE_KEY);
+    if (raw) {
+      applyCauldronPayload(JSON.parse(raw));
+    }
+  } catch (error) {
+    // Ignore corrupt storage and keep defaults.
+  }
+}
+
+function saveCauldronSlotsToStorage() {
+  try {
+    window.localStorage.setItem(CAULDRON_SLOT_STORAGE_KEY, JSON.stringify(state.cauldronSlots));
+  } catch (error) {
+    // Ignore storage errors so the calculator remains usable.
+  }
+}
+
+function loadCauldronSlotsFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(CAULDRON_SLOT_STORAGE_KEY);
+    state.cauldronSlots = raw
+      ? normalizeLayoutSlots(JSON.parse(raw))
+      : Array.from({ length: MAX_LAYOUT_SLOTS }, () => null);
+  } catch (error) {
+    state.cauldronSlots = Array.from({ length: MAX_LAYOUT_SLOTS }, () => null);
+  }
+}
+
+function currentCalculatorPayload() {
+  return {
+    target: recipeTargetSelect.value,
+    level: recipeTargetLevelInput.value,
+    count: recipeTargetCountInput.value,
+    selections: [...state.recipeSelections.entries()],
+  };
+}
+
+function saveCalculatorStateToStorage() {
+  try {
+    window.localStorage.setItem(CALCULATOR_STORAGE_KEY, JSON.stringify(currentCalculatorPayload()));
+  } catch (error) {
+    // Ignore storage errors so the calculator remains usable.
+  }
+}
+
+function loadCalculatorStateFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(CALCULATOR_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+    const payload = JSON.parse(raw);
+    recipeTargetLevelInput.value = String(Math.max(0, Number(payload.level) || 0));
+    recipeTargetCountInput.value = String(Math.max(1, Number(payload.count) || 1));
+    state.recipeSelections = new Map(Array.isArray(payload.selections) ? payload.selections : []);
+    if (typeof payload.target === "string") {
+      recipeTargetSelect.dataset.pendingValue = payload.target;
+    }
+  } catch (error) {
+    // Ignore corrupt storage and keep defaults.
+  }
+}
+
 function slotDisplayName(slot, index) {
   return slot?.name?.trim() || `슬롯 ${index + 1}`;
 }
@@ -540,7 +693,7 @@ function formatSlotTimestamp(savedAt) {
   });
 }
 
-function renderLayoutSlots() {
+function renderLegacyLayoutSlots() {
   slotList.innerHTML = "";
 
   state.layoutSlots.forEach((slot, index) => {
@@ -621,10 +774,140 @@ function renderLayoutSlots() {
   });
 }
 
+function activeSlotConfig() {
+  if (state.activeSlotMode === "cauldron") {
+    return {
+      title: "가마솥 배치 저장/불러오기",
+      slots: state.cauldronSlots,
+      saveSlots: saveCauldronSlotsToStorage,
+      currentPayload: currentCauldronPayload,
+      applyPayload: (payload) => {
+        applyCauldronPayload(payload);
+        saveCauldronStateToStorage();
+        renderMaterialCalculator();
+      },
+    };
+  }
+
+  return {
+    title: "밭 배치 저장/불러오기",
+    slots: state.layoutSlots,
+    saveSlots: saveLayoutSlotsToStorage,
+    currentPayload: currentLayoutPayload,
+    applyPayload: (payload) => {
+      applyLayoutPayload(payload);
+      saveLayoutToStorage();
+      renderPalette();
+      centerView();
+    },
+  };
+}
+
+function openSlotModal(mode) {
+  state.activeSlotMode = mode;
+  renderLayoutSlots();
+  slotPanel.hidden = false;
+  slotModalBackdrop.hidden = false;
+}
+
+function closeSlotModal() {
+  slotPanel.hidden = true;
+  slotModalBackdrop.hidden = true;
+}
+
+function renderLayoutSlots() {
+  const config = activeSlotConfig();
+  const title = slotPanel.querySelector(".slot-panel-header h3");
+  const description = slotPanel.querySelector(".slot-panel-header p");
+  if (title) {
+    title.textContent = config.title;
+  }
+  if (description) {
+    description.textContent = "최대 10개 저장";
+  }
+
+  slotList.innerHTML = "";
+
+  config.slots.forEach((slot, index) => {
+    const row = document.createElement("article");
+    row.className = "slot-row";
+
+    const nameInput = document.createElement("input");
+    nameInput.className = "slot-name-input";
+    nameInput.type = "text";
+    nameInput.maxLength = 24;
+    nameInput.placeholder = `슬롯 ${index + 1}`;
+    nameInput.value = slot?.name ?? "";
+    nameInput.setAttribute("aria-label", `슬롯 ${index + 1} 이름`);
+    nameInput.addEventListener("change", () => {
+      if (config.slots[index]) {
+        config.slots[index].name = nameInput.value.trim();
+        config.saveSlots();
+        renderLayoutSlots();
+      }
+    });
+
+    const meta = document.createElement("p");
+    meta.className = "slot-meta";
+    meta.textContent = slot
+      ? `${slotDisplayName(slot, index)} · ${formatSlotTimestamp(slot.savedAt)}`
+      : `슬롯 ${index + 1} · 비어 있음`;
+
+    const actions = document.createElement("div");
+    actions.className = "slot-actions";
+
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.className = "slot-action-button";
+    saveButton.textContent = "저장";
+    saveButton.addEventListener("click", () => {
+      config.slots[index] = {
+        name: nameInput.value.trim(),
+        payload: config.currentPayload(),
+        savedAt: Date.now(),
+      };
+      config.saveSlots();
+      renderLayoutSlots();
+      showCopyFeedback(`${slotDisplayName(config.slots[index], index)}에 저장했습니다.`);
+    });
+
+    const loadButton = document.createElement("button");
+    loadButton.type = "button";
+    loadButton.className = "slot-action-button subtle";
+    loadButton.textContent = "불러오기";
+    loadButton.disabled = !slot;
+    loadButton.addEventListener("click", () => {
+      if (!config.slots[index]) {
+        return;
+      }
+      config.applyPayload(config.slots[index].payload);
+      renderLayoutSlots();
+      showCopyFeedback(`${slotDisplayName(config.slots[index], index)}을 불러왔습니다.`);
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "slot-action-button subtle";
+    deleteButton.textContent = "삭제";
+    deleteButton.disabled = !slot;
+    deleteButton.addEventListener("click", () => {
+      config.slots[index] = null;
+      config.saveSlots();
+      renderLayoutSlots();
+      showCopyFeedback(`슬롯 ${index + 1}을 비웠습니다.`);
+    });
+
+    actions.append(saveButton, loadButton, deleteButton);
+    row.append(nameInput, meta, actions);
+    slotList.appendChild(row);
+  });
+}
+
 function setActiveTab(tabId) {
   state.activeTab = tabId;
   plannerView.hidden = tabId !== "planner";
   calculatorView.hidden = tabId !== "calculator";
+  materialsView.hidden = tabId !== "materials";
 
   tabButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === tabId);
@@ -632,6 +915,8 @@ function setActiveTab(tabId) {
 
   if (tabId === "planner") {
     resizeCanvas();
+  } else if (tabId === "materials") {
+    renderMaterialCalculator();
   }
 }
 
@@ -660,6 +945,66 @@ function parseRecipeCsv(text) {
       key1: normalizeItemName(material1),
       key2: normalizeItemName(material2),
       resultKey: normalizeItemName(result),
+    }));
+}
+
+function parseCsvLine(line) {
+  const cells = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+
+    if (char === '"' && quoted && nextChar === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      cells.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  cells.push(current);
+  return cells.map((value) => value.trim());
+}
+
+function parseDurationSeconds(value) {
+  const text = String(value ?? "").trim().toLowerCase();
+  const amount = Number.parseFloat(text);
+  if (!Number.isFinite(amount)) {
+    return 0;
+  }
+
+  if (text.endsWith("m")) {
+    return amount * 60;
+  }
+
+  return amount;
+}
+
+function parsePotionCsv(text) {
+  const [headerLine, ...lines] = text.replace(/^\uFEFF/, "").trim().split(/\r?\n/);
+  if (!headerLine) {
+    return [];
+  }
+
+  return lines
+    .map(parseCsvLine)
+    .filter((parts) => parts.length >= 5)
+    .map(([name, material1, material2, duration, price], index) => ({
+      id: `potion-${index}-${normalizeItemName(name)}`,
+      type: "potion",
+      name,
+      material1,
+      material2,
+      durationSeconds: parseDurationSeconds(duration),
+      price: Number(price) || 0,
     }));
 }
 
@@ -965,6 +1310,10 @@ function renderRecipeCalculator() {
       <optgroup label="중간재료">${intermediateOptions}</optgroup>
       <optgroup label="완성품">${finalOptions}</optgroup>
     `;
+    if (recipeTargetSelect.dataset.pendingValue) {
+      recipeTargetSelect.value = recipeTargetSelect.dataset.pendingValue;
+      delete recipeTargetSelect.dataset.pendingValue;
+    }
   }
 
   const selectedKey = recipeTargetSelect.value || state.recipes[0].resultKey;
@@ -1023,6 +1372,7 @@ function renderRecipeCalculator() {
   `;
 
   renderRecipeTable();
+  saveCalculatorStateToStorage();
 }
 
 async function loadRecipes() {
@@ -1035,10 +1385,333 @@ async function loadRecipes() {
     state.recipes = parseRecipeCsv(await response.text());
     recipeTargetSelect.innerHTML = "";
     renderRecipeCalculator();
+    renderMaterialCalculator();
   } catch (error) {
     recipeSummary.innerHTML = `<p>조합법.csv를 불러오지 못했습니다.</p>`;
     recipeBreakdown.innerHTML = "";
     recipeList.innerHTML = "";
+  }
+}
+
+function allCraftItemOptions() {
+  const items = new Map();
+  state.recipes.forEach((recipe) => {
+    items.set(recipe.key1, itemDisplayName(recipe.key1));
+    items.set(recipe.key2, itemDisplayName(recipe.key2));
+    items.set(recipe.resultKey, recipe.result);
+  });
+  return [...items.entries()].sort((a, b) => a[1].localeCompare(b[1], "ko"));
+}
+
+function defaultCauldronRecipeValue() {
+  return state.potionRecipes[0] ? `potion:${state.potionRecipes[0].id}` : "";
+}
+
+function createCauldron(tierId) {
+  return {
+    id: `${tierId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    level: 0,
+    recipeValue: defaultCauldronRecipeValue(),
+  };
+}
+
+function addCauldron(tierId) {
+  state.cauldrons[tierId].push(createCauldron(tierId));
+  saveCauldronStateToStorage();
+  renderMaterialCalculator();
+}
+
+function recipeSelectOptions(selectedValue) {
+  const potionOptions = state.potionRecipes
+    .map((recipe) => `<option value="potion:${recipe.id}">${recipe.name}</option>`)
+    .join("");
+  const craftOptions = state.recipes
+    .map((recipe) => `<option value="craft:${recipe.resultKey}">${recipe.result}</option>`)
+    .join("");
+  const enhanceOptions = allCraftItemOptions()
+    .map(([key, name]) => `<option value="enhance:${key}">${name} +1강</option>`)
+    .join("");
+
+  const html = `
+    <optgroup label="양조">${potionOptions}</optgroup>
+    <optgroup label="강화">${enhanceOptions}</optgroup>
+    <optgroup label="조합">${craftOptions}</optgroup>
+  `;
+
+  return html.replace(`value="${selectedValue}"`, `value="${selectedValue}" selected`);
+}
+
+function selectedRecipeDetails(value) {
+  const [type, id] = String(value || "").split(":");
+  if (type === "potion") {
+    const recipe = state.potionRecipes.find((candidate) => candidate.id === id);
+    return recipe ? { type, recipe } : null;
+  }
+
+  if (type === "craft") {
+    const recipe = recipeSourceMap().get(id);
+    return recipe ? { type, recipe } : null;
+  }
+
+  if (type === "enhance") {
+    return { type, recipe: { name: itemDisplayName(id) } };
+  }
+
+  return null;
+}
+
+function effectiveRecipeSeconds(baseSeconds, level) {
+  const multiplier = Math.max(0.05, 1 - Math.max(0, level) * 0.05);
+  return baseSeconds * multiplier;
+}
+
+function formatNumber(value, maximumFractionDigits = 2) {
+  return value.toLocaleString("ko-KR", { maximumFractionDigits });
+}
+
+function renderCauldronCard(tier, cauldron) {
+  const selected = selectedRecipeDetails(cauldron.recipeValue);
+  const level = Math.max(0, Number(cauldron.level) || 0);
+  let meta = "레시피를 선택해주세요.";
+
+  if (selected?.type === "potion") {
+    const seconds = effectiveRecipeSeconds(selected.recipe.durationSeconds, level);
+    const cyclesPerHour = seconds > 0 ? 3600 / seconds : 0;
+    meta = `${selected.recipe.material1} + ${selected.recipe.material2} · ${formatNumber(seconds, 1)}초/회 · 시간당 ${formatNumber(cyclesPerHour, 2)}회`;
+  } else if (selected?.type === "craft") {
+    meta = `${selected.recipe.material1} + ${selected.recipe.material2} · 조합 소요 시간 데이터가 없어 집계 제외`;
+  } else if (selected?.type === "enhance") {
+    meta = `동일 아이템 2개 사용 · 강화 소요 시간 데이터가 없어 집계 제외`;
+  }
+
+  return `
+    <article class="cauldron-card" data-tier="${tier.id}" data-id="${cauldron.id}">
+      <div class="cauldron-card-header">
+        <strong><span class="${tier.iconClass}">${tier.icon}</span> ${tier.name}</strong>
+        <button class="cauldron-delete" type="button" data-action="delete-cauldron" aria-label="가마솥 삭제">삭제</button>
+      </div>
+      <div class="cauldron-controls">
+        <label class="compact-field">
+          <span>강화</span>
+          <input class="cauldron-level-input" data-action="change-cauldron-level" type="number" min="0" max="20" value="${level}" />
+        </label>
+        <label class="compact-field recipe-field">
+          <span>레시피</span>
+          <select class="cauldron-recipe-select" data-action="change-cauldron-recipe">
+            ${recipeSelectOptions(cauldron.recipeValue)}
+          </select>
+        </label>
+      </div>
+      <p>${meta}</p>
+    </article>
+  `;
+}
+
+function collectHourlyMaterialUsage() {
+  const usage = new Map();
+
+  CAULDRON_TIERS.forEach((tier) => {
+    state.cauldrons[tier.id].forEach((cauldron) => {
+      const selected = selectedRecipeDetails(cauldron.recipeValue);
+      if (selected?.type !== "potion" || selected.recipe.durationSeconds <= 0) {
+        return;
+      }
+
+      const seconds = effectiveRecipeSeconds(selected.recipe.durationSeconds, cauldron.level);
+      const cyclesPerHour = seconds > 0 ? 3600 / seconds : 0;
+      [selected.recipe.material1, selected.recipe.material2].forEach((material) => {
+        usage.set(material, (usage.get(material) ?? 0) + cyclesPerHour);
+      });
+    });
+  });
+
+  return [...usage.entries()].sort((a, b) => a[0].localeCompare(b[0], "ko"));
+}
+
+function renderMaterialUsageSummary() {
+  const usage = collectHourlyMaterialUsage();
+  const { cropYieldTotals } = calculateCropProduction();
+  const fieldProduction = new Map();
+  CROPS.filter((crop) => crop.hourlyYield > 0).forEach((crop) => {
+    const producedMaterial = CROP_PRODUCTION_MATERIALS[crop.id] ?? crop.name;
+    fieldProduction.set(producedMaterial, (fieldProduction.get(producedMaterial) ?? 0) + (cropYieldTotals.get(crop.id) ?? 0));
+  });
+  const producedMaterials = [...fieldProduction.entries()]
+    .filter(([, count]) => count > 0)
+    .map(([material]) => material);
+  const materials = [...new Set([...usage.map(([material]) => material), ...producedMaterials])]
+    .sort((a, b) => a.localeCompare(b, "ko"));
+
+  if (!usage.length) {
+    materialUsageSummary.innerHTML = `
+      <h4>시간당 재료 소모량</h4>
+      <p>양조 레시피가 선택된 가마솥이 없습니다.</p>
+      ${renderFieldProductionTable(fieldProduction)}
+    `;
+    return;
+  }
+
+  const usageMap = new Map(usage);
+  const rows = usage
+    .map(
+      ([material, count]) => `
+        <tr>
+          <td><strong>${material}</strong></td>
+          <td>${formatNumber(count, 2)}개/시간</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  materialUsageSummary.innerHTML = `
+    <h4>시간당 재료 소모량</h4>
+    <table class="mini-table">
+      <thead>
+        <tr>
+          <th>재료</th>
+          <th>소모량</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${renderFieldProductionTable(fieldProduction)}
+    ${renderMaterialBalanceTable(materials, usageMap, fieldProduction)}
+  `;
+}
+
+function renderFieldProductionTable(fieldProduction) {
+  const rows = [...fieldProduction.entries()]
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => a[0].localeCompare(b[0], "ko"))
+    .map(
+      ([material, count]) => `
+        <tr>
+          <td><strong>${material}</strong></td>
+          <td>${formatNumber(count, 2)}개/시간</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  return `
+    <h4 class="material-summary-heading">밭 생산량</h4>
+    ${
+      rows
+        ? `<table class="mini-table">
+            <thead>
+              <tr>
+                <th>재료</th>
+                <th>생산량</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>`
+        : `<p>생산 중인 재료가 없습니다.</p>`
+    }
+  `;
+}
+
+function renderMaterialBalanceTable(materials, usageMap, fieldProduction) {
+  if (!materials.length) {
+    return "";
+  }
+
+  const rows = materials
+    .map((material) => {
+      const produced = fieldProduction.get(material) ?? 0;
+      const consumed = usageMap.get(material) ?? 0;
+      const balance = produced - consumed;
+      const className = balance >= 0 ? "positive" : "negative";
+      return `
+        <tr>
+          <td><strong>${material}</strong></td>
+          <td>${formatNumber(produced, 2)}</td>
+          <td>${formatNumber(consumed, 2)}</td>
+          <td class="${className}">${balance >= 0 ? "+" : ""}${formatNumber(balance, 2)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <h4 class="material-summary-heading">최종 증/감</h4>
+    <table class="mini-table">
+      <thead>
+        <tr>
+          <th>재료</th>
+          <th>생산</th>
+          <th>소모</th>
+          <th>증감</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderMaterialCalculator() {
+  if (!cauldronBoard || !materialUsageSummary) {
+    return;
+  }
+
+  if (!state.potionRecipes.length) {
+    cauldronBoard.innerHTML = `<div class="result-card"><p>포션.csv를 불러오는 중입니다.</p></div>`;
+    materialUsageSummary.innerHTML = "";
+    return;
+  }
+
+  const scrollPositions = new Map(
+    [...cauldronBoard.querySelectorAll(".cauldron-row")].map((row) => {
+      const list = row.querySelector(".cauldron-list");
+      return [row.dataset.tier, list?.scrollLeft ?? 0];
+    }),
+  );
+
+  cauldronBoard.innerHTML = CAULDRON_TIERS.map((tier) => {
+    const cards = state.cauldrons[tier.id]
+      .map((cauldron) => renderCauldronCard(tier, cauldron))
+      .join("");
+
+    return `
+      <section class="cauldron-row" data-tier="${tier.id}">
+        <div class="cauldron-row-header">
+          <h3>${tier.name}</h3>
+          <button type="button" data-action="add-cauldron" data-tier="${tier.id}">+</button>
+        </div>
+        <div class="cauldron-list">
+          ${cards || `<p class="empty-row">오른쪽 + 버튼으로 ${tier.name}을 추가하세요.</p>`}
+        </div>
+      </section>
+    `;
+  }).join("");
+
+  cauldronBoard.querySelectorAll(".cauldron-row").forEach((row) => {
+    const list = row.querySelector(".cauldron-list");
+    if (list) {
+      list.scrollLeft = scrollPositions.get(row.dataset.tier) ?? 0;
+    }
+  });
+
+  renderMaterialUsageSummary();
+}
+
+async function loadPotionRecipes() {
+  try {
+    const response = await fetch("./포션.csv", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Potion csv load failed");
+    }
+
+    state.potionRecipes = parsePotionCsv(await response.text());
+    CAULDRON_TIERS.forEach((tier) => {
+      if (!state.cauldrons[tier.id].length) {
+        state.cauldrons[tier.id].push(createCauldron(tier.id));
+      }
+    });
+    renderMaterialCalculator();
+  } catch (error) {
+    cauldronBoard.innerHTML = `<div class="result-card"><p>포션.csv를 불러오지 못했습니다.</p></div>`;
+    materialUsageSummary.innerHTML = "";
   }
 }
 
@@ -1669,6 +2342,31 @@ function renderPalette() {
 }
 
 function renderProductionStats() {
+  const { cropCounts, cropYieldTotals, totalYield } = calculateCropProduction();
+  const displayedTotalYield = state.boostPotionActive ? totalYield * 1.5 : totalYield;
+
+  productionSummary.textContent = `시간당 총 생산량 ${displayedTotalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
+  if (state.boostPotionActive) {
+    productionSummary.textContent += " (촉진포션 On)";
+  }
+
+  productionGrid.innerHTML = "";
+
+  CROPS.filter((crop) => crop.hourlyYield > 0).forEach((crop) => {
+    const count = cropCounts.get(crop.id) ?? 0;
+    const yieldTotal = cropYieldTotals.get(crop.id) ?? 0;
+    const card = document.createElement("article");
+    card.className = "production-card";
+    card.innerHTML = `
+      <strong>${crop.name}</strong>
+      <p>심은 개수: ${count}개</p>
+      <p>시간당 생산량: ${yieldTotal.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개</p>
+    `;
+    productionGrid.appendChild(card);
+  });
+}
+
+function calculateCropProduction() {
   const cropCounts = new Map(CROPS.map((crop) => [crop.id, 0]));
   const effects = buildEffectMap();
   const cropYieldTotals = new Map(CROPS.map((crop) => [crop.id, 0]));
@@ -1691,27 +2389,8 @@ function renderProductionStats() {
   }
 
   const totalYield = [...cropYieldTotals.values()].reduce((sum, value) => sum + value, 0);
-  const displayedTotalYield = state.boostPotionActive ? totalYield * 1.5 : totalYield;
 
-  productionSummary.textContent = `시간당 총 생산량 ${displayedTotalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
-  if (state.boostPotionActive) {
-    productionSummary.textContent += " (촉진포션 On)";
-  }
-
-  productionGrid.innerHTML = "";
-
-  CROPS.forEach((crop) => {
-    const count = cropCounts.get(crop.id) ?? 0;
-    const yieldTotal = cropYieldTotals.get(crop.id) ?? 0;
-    const card = document.createElement("article");
-    card.className = "production-card";
-    card.innerHTML = `
-      <strong>${crop.name}</strong>
-      <p>심은 개수: ${count}개</p>
-      <p>시간당 생산량: ${yieldTotal.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개</p>
-    `;
-    productionGrid.appendChild(card);
-  });
+  return { cropCounts, cropYieldTotals, totalYield };
 }
 
 function getNeighborPlantIds(key) {
@@ -2155,6 +2834,22 @@ tabButtons.forEach((button) => {
   });
 });
 
+openLayoutSlotsButton.addEventListener("click", () => {
+  openSlotModal("layout");
+});
+
+openCauldronSlotsButton.addEventListener("click", () => {
+  openSlotModal("cauldron");
+});
+
+slotModalBackdrop.addEventListener("click", closeSlotModal);
+
+slotPanel.addEventListener("click", (event) => {
+  if (event.target.dataset.action === "close-slot-dialog") {
+    closeSlotModal();
+  }
+});
+
 recipeTargetSelect.addEventListener("change", () => {
   renderRecipeCalculator();
 });
@@ -2165,6 +2860,57 @@ recipeTargetLevelInput.addEventListener("input", () => {
 
 recipeTargetCountInput.addEventListener("input", () => {
   renderRecipeCalculator();
+});
+
+cauldronBoard.addEventListener("click", (event) => {
+  const action = event.target.dataset.action;
+  if (action === "add-cauldron") {
+    addCauldron(event.target.dataset.tier);
+    return;
+  }
+
+  if (action === "delete-cauldron") {
+    const card = event.target.closest(".cauldron-card");
+    if (!card) {
+      return;
+    }
+    const cauldrons = state.cauldrons[card.dataset.tier];
+    state.cauldrons[card.dataset.tier] = cauldrons.filter((cauldron) => cauldron.id !== card.dataset.id);
+    saveCauldronStateToStorage();
+    renderMaterialCalculator();
+  }
+});
+
+cauldronBoard.addEventListener("input", (event) => {
+  if (event.target.dataset.action !== "change-cauldron-level") {
+    return;
+  }
+
+  const card = event.target.closest(".cauldron-card");
+  const cauldron = state.cauldrons[card.dataset.tier].find((item) => item.id === card.dataset.id);
+  if (!cauldron) {
+    return;
+  }
+
+  cauldron.level = Math.max(0, Math.min(20, Number(event.target.value) || 0));
+  saveCauldronStateToStorage();
+  renderMaterialCalculator();
+});
+
+cauldronBoard.addEventListener("change", (event) => {
+  if (event.target.dataset.action !== "change-cauldron-recipe") {
+    return;
+  }
+
+  const card = event.target.closest(".cauldron-card");
+  const cauldron = state.cauldrons[card.dataset.tier].find((item) => item.id === card.dataset.id);
+  if (!cauldron) {
+    return;
+  }
+
+  cauldron.recipeValue = event.target.value;
+  saveCauldronStateToStorage();
+  renderMaterialCalculator();
 });
 
 copyLayoutButton.addEventListener("click", () => {
@@ -2249,6 +2995,9 @@ window.__planner_debug = {
 };
 
 loadLayoutSlotsFromStorage();
+loadCauldronSlotsFromStorage();
+loadCalculatorStateFromStorage();
+loadCauldronStateFromStorage();
 const loadedSharedLayout = loadLayoutFromUrl();
 if (!loadedSharedLayout) {
   loadLayoutFromStorage();
@@ -2261,10 +3010,12 @@ renderStatsPanel();
 renderBoostPotionButton();
 renderLayoutSlots();
 renderRecipeCalculator();
+renderMaterialCalculator();
 draw();
 resizeCanvas();
 startCanvasResolutionWatcher();
 loadRecipes();
+loadPotionRecipes();
 window.addEventListener("resize", syncResponsivePanels);
 window.addEventListener("hashchange", () => {
   applySharedLayoutFromCurrentUrl(true);

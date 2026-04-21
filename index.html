@@ -20,6 +20,7 @@
       <nav class="tab-bar" aria-label="시뮬레이터 탭">
         <button class="tab-button active" type="button" data-tab="planner">배치 테스트</button>
         <button class="tab-button" type="button" data-tab="calculator">기댓값 계산기</button>
+        <button class="tab-button" type="button" data-tab="materials">재료 소모량 계산기</button>
       </nav>
 
       <section id="planner-view" class="tab-view">
@@ -37,7 +38,7 @@
               <button id="reset-button" type="button">초기화</button>
             </div>
           </div>
-          <div id="crop-palette" class="crop-palette horizontal" aria-label="씨앗 선택"></div>
+          <div id="crop-palette" class="crop-palette horizontal" aria-label="식물 선택"></div>
           <div class="canvas-wrap">
             <canvas
               id="field-canvas"
@@ -101,6 +102,22 @@
               <h4>조합법 목록</h4>
               <div id="recipe-list" class="table-stack"></div>
             </div>
+          </section>
+        </section>
+      </section>
+
+      <section id="materials-view" class="tab-view" hidden>
+        <section class="calculator-card">
+          <header class="calculator-header">
+            <div>
+              <h2>재료 소모량 계산기</h2>
+              <p>가마솥별 양조 레시피를 배치하고 1시간에 소모되는 재료량을 계산합니다.</p>
+            </div>
+          </header>
+
+          <section class="calculator-content">
+            <div id="cauldron-board" class="cauldron-board"></div>
+            <div id="material-usage-summary" class="result-card"></div>
           </section>
         </section>
       </section>

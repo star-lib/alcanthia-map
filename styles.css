@@ -153,6 +153,13 @@ body {
   flex-wrap: wrap;
 }
 
+.canvas-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 10px;
+}
+
 .palette-dock {
   display: grid;
   gap: 12px;
@@ -187,6 +194,7 @@ body {
 #toggle-pan-lock-button,
 #copy-layout-button,
 #share-layout-button,
+#layout-slots-button,
 #expand-ring-button,
 #reset-button,
 #clear-crops-button {
@@ -261,6 +269,7 @@ body {
 #toggle-pan-lock-button,
 #copy-layout-button,
 #share-layout-button,
+#layout-slots-button,
 #expand-ring-button,
 #clear-crops-button {
   border-radius: 999px;
@@ -288,6 +297,12 @@ body {
   box-shadow: 0 10px 25px rgba(47, 102, 82, 0.22);
 }
 
+#layout-slots-button,
+.slot-open-button {
+  background: #8e7b62;
+  box-shadow: 0 10px 25px rgba(92, 66, 37, 0.2);
+}
+
 #expand-ring-button {
   background: #4f7f8f;
   box-shadow: 0 10px 25px rgba(47, 88, 112, 0.2);
@@ -303,9 +318,19 @@ body {
   box-shadow: 0 10px 25px rgba(84, 92, 46, 0.2);
 }
 
+.canvas-actions #toggle-pan-lock-button,
+.canvas-actions #expand-ring-button,
+.canvas-actions #clear-crops-button,
+.canvas-actions #reset-button {
+  padding: 9px 13px;
+  font-size: 0.86rem;
+  box-shadow: none;
+}
+
 #toggle-pan-lock-button:hover,
 #copy-layout-button:hover,
 #share-layout-button:hover,
+#layout-slots-button:hover,
 #expand-ring-button:hover,
 #reset-button:hover,
 #clear-crops-button:hover {
@@ -570,6 +595,55 @@ body {
   cursor: default;
 }
 
+.slot-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  border: 0;
+  background: rgba(34, 26, 16, 0.36);
+  cursor: pointer;
+}
+
+.slot-modal-backdrop[hidden] {
+  display: none;
+}
+
+.slot-panel.slot-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 90;
+  width: min(920px, calc(100vw - 28px));
+  max-height: min(760px, calc(100vh - 36px));
+  margin: 0;
+  transform: translate(-50%, -50%);
+  overflow: auto;
+  background: rgba(255, 250, 242, 0.98);
+}
+
+.slot-panel.slot-modal[hidden] {
+  display: none;
+}
+
+.slot-modal-close,
+.slot-open-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: #fffaf2;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.slot-modal-close {
+  background: #8e7b62;
+}
+
+.slot-open-button {
+  justify-self: start;
+}
+
 .calculator-card {
   padding: 22px;
   border: 1px solid var(--card-border);
@@ -687,6 +761,20 @@ body {
   border-bottom: 0;
 }
 
+.mini-table td.positive {
+  color: #52722e;
+  font-weight: 800;
+}
+
+.mini-table td.negative {
+  color: #b7553d;
+  font-weight: 800;
+}
+
+.result-card .material-summary-heading {
+  margin-top: 24px;
+}
+
 .recipe-list-wrap {
   display: grid;
   gap: 10px;
@@ -735,6 +823,156 @@ body {
   gap: 10px;
   padding-left: 14px;
   border-left: 2px solid rgba(92, 66, 37, 0.1);
+}
+
+.cauldron-board {
+  display: grid;
+  gap: 16px;
+}
+
+.cauldron-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(92, 66, 37, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.cauldron-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cauldron-row-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.cauldron-row-header button,
+.cauldron-delete {
+  border: 0;
+  border-radius: 999px;
+  color: #fffaf2;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cauldron-row-header button {
+  width: 42px;
+  height: 42px;
+  background: #7c8c5a;
+  box-shadow: 0 10px 24px rgba(84, 92, 46, 0.18);
+}
+
+.cauldron-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.cauldron-card {
+  flex: 0 0 176px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(92, 66, 37, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.cauldron-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.cauldron-card-header strong {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.cauldron-card-header strong span {
+  display: inline-grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #d8b76b;
+  color: #513b18;
+  font-size: 0.62rem;
+}
+
+.cauldron-card[data-tier="silver"] .cauldron-card-header strong span {
+  background: #d7dde4;
+  color: #43505b;
+}
+
+.cauldron-card[data-tier="copper"] .cauldron-card-header strong span {
+  background: #c9824b;
+  color: #fff7ea;
+}
+
+.cauldron-delete {
+  padding: 5px 7px;
+  background: #8e7b62;
+  font-size: 0.68rem;
+}
+
+.cauldron-controls {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 5px;
+}
+
+.compact-field {
+  display: grid;
+  gap: 4px;
+}
+
+.compact-field span {
+  color: var(--text-soft);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.compact-field input,
+.compact-field select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 5px 6px;
+  border-radius: 9px;
+  border: 1px solid rgba(92, 66, 37, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.74rem;
+}
+
+.cauldron-level-input {
+  text-align: center;
+}
+
+.cauldron-card p,
+.empty-row {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.empty-row {
+  padding: 16px 4px;
 }
 
 .site-note {
@@ -879,6 +1117,7 @@ body {
   #toggle-pan-lock-button,
   #copy-layout-button,
   #share-layout-button,
+  #layout-slots-button,
   #expand-ring-button,
   #clear-crops-button,
   #reset-button {
