@@ -1984,8 +1984,8 @@ function buildCauldronRecipesFromTimeData() {
 }
 
 function normalizeCauldronRecipes() {
-  const available = new Set(state.cauldronRecipes.map((recipe) => recipe.value));
-  const fallback = state.cauldronRecipes[0]?.value ?? "";
+  const available = new Set(brewingCauldronRecipes().map((recipe) => recipe.value));
+  const fallback = brewingCauldronRecipes()[0]?.value ?? "";
   CAULDRON_TIERS.forEach((tier) => {
     state.cauldrons[tier.id].forEach((cauldron) => {
       if (!available.has(cauldron.recipeValue)) {
@@ -2005,8 +2005,12 @@ function effectiveCauldronRecipeSeconds(recipe, cauldronLevel) {
   return Math.round(baseDurationMs * (1 - flameReduction)) / MILLIS_IN_SECOND;
 }
 
+function brewingCauldronRecipes() {
+  return state.cauldronRecipes.filter((recipe) => recipe.kind === "potion");
+}
+
 function defaultCauldronRecipeValue() {
-  return state.cauldronRecipes[0]?.value ?? "";
+  return brewingCauldronRecipes()[0]?.value ?? "";
 }
 
 function createCauldron(tierId) {
@@ -2024,30 +2028,19 @@ function addCauldron(tierId) {
 }
 
 function recipeSelectOptions(selectedValue) {
-  const potionOptions = state.cauldronRecipes
-    .filter((recipe) => recipe.kind === "potion")
-    .map((recipe) => `<option value="${recipe.value}">${recipe.name}</option>`)
-    .join("");
-  const craftOptions = state.cauldronRecipes
-    .filter((recipe) => recipe.kind === "craft")
-    .map((recipe) => `<option value="${recipe.value}">${recipe.name}</option>`)
-    .join("");
-  const engraveOptions = state.cauldronRecipes
-    .filter((recipe) => recipe.kind === "engrave")
+  const potionOptions = brewingCauldronRecipes()
     .map((recipe) => `<option value="${recipe.value}">${recipe.name}</option>`)
     .join("");
 
   const html = `
-    <optgroup label="양조">${potionOptions}</optgroup>
-    <optgroup label="조합">${craftOptions}</optgroup>
-    <optgroup label="각인">${engraveOptions}</optgroup>
+    <optgroup label="???">${potionOptions}</optgroup>
   `;
 
   return html.replace(`value="${selectedValue}"`, `value="${selectedValue}" selected`);
 }
 
 function selectedRecipeDetails(value) {
-  const recipe = state.cauldronRecipes.find((candidate) => candidate.value === value);
+  const recipe = brewingCauldronRecipes().find((candidate) => candidate.value === value);
   return recipe ? { type: recipe.kind, recipe } : null;
 }
 
@@ -2239,7 +2232,7 @@ function renderMaterialCalculator() {
     return;
   }
 
-  if (!state.cauldronRecipes.length) {
+  if (!brewingCauldronRecipes().length) {
     cauldronBoard.innerHTML = `<div class="result-card"><p>원본 앱 레시피를 불러오는 중입니다.</p></div>`;
     materialUsageSummary.innerHTML = "";
     return;
@@ -3178,17 +3171,17 @@ function renderSkillTree() {
       </div>
       <div class="skill-summary-stats">
         <div class="skill-summary-title-card">
-          <span class="skill-summary-level-label">??? ???</span>
+          <span class="skill-summary-level-label">현재 칭호</span>
           <strong class="skill-summary-title-value">${witchTitle.title.name}</strong>
         </div>
         <div class="skill-summary-level-card">
-          <span class="skill-summary-level-label">??? ???</span>
+          <span class="skill-summary-level-label">필요 레벨</span>
           <strong class="skill-summary-level-value">Lv ${formatNumber(neededLevel, 0)}</strong>
-          <small>????? SP ${formatNumber(totalSpent, 0)}</small>
+          <small>총 투자 SP ${formatNumber(totalSpent, 0)}</small>
         </div>
         <div class="skill-summary-meta">
-          <p>??? ???: <strong>${formatNumber(unlockedCount, 0)}</strong> / ${formatNumber(state.skills.length, 0)}</p>
-          <button type="button" class="skill-reset-button" data-action="reset-skills">??? ???</button>
+          <p>해금 스킬: <strong>${formatNumber(unlockedCount, 0)}</strong> / ${formatNumber(state.skills.length, 0)}</p>
+          <button type="button" class="skill-reset-button" data-action="reset-skills">스킬 리셋</button>
         </div>
       </div>
       </div>

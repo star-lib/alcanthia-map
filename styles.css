@@ -52,6 +52,43 @@ body {
   line-height: 1.05;
 }
 
+.hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.discord-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #5865f2, #7b84ff);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  box-shadow: 0 12px 28px rgba(88, 101, 242, 0.24);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+}
+
+.discord-link-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(88, 101, 242, 0.28);
+  filter: saturate(1.08);
+}
+
+.discord-link-button:focus-visible {
+  outline: 3px solid rgba(88, 101, 242, 0.28);
+  outline-offset: 2px;
+}
+
 .hero-copy {
   max-width: 760px;
   margin: 14px 0 0;
