@@ -23,7 +23,7 @@
         <button class="tab-button" type="button" data-tab="materials">재료 소모량 계산기</button>
         <button class="tab-button" type="button" data-tab="time">시간 계산기</button>
         <button class="tab-button" type="button" data-tab="skills">스킬 트리</button>
-        <button class="tab-button" type="button" data-tab="skill-points">스킬 포인트 계산기</button>
+        <button class="tab-button" type="button" data-tab="skill-points">성장 포션 계산기</button>
       </nav>
 
       <section id="planner-view" class="tab-view">
@@ -146,7 +146,6 @@
                   <option value="craft">제작</option>
                   <option value="enhancement">강화</option>
                   <option value="engrave">각인</option>
-                  <option value="utility">유틸</option>
                 </select>
               </label>
               <label class="field">
@@ -157,10 +156,6 @@
                 <span>불꽃 숙련</span>
                 <input id="time-flame-mastery" type="number" min="0" max="20" value="0" readonly />
                 <small>스킬 트리의 불꽃 숙련 레벨을 자동으로 불러옵니다.</small>
-              </label>
-              <label class="field">
-                <span>불꽃 포션 강화</span>
-                <input id="time-fire-potion-level" type="number" min="-1" max="20" value="-1" />
               </label>
             </div>
 
@@ -209,15 +204,13 @@
               <h3>기본시간 빠른 참조</h3>
               <label class="field time-filter-field">
                 <span>검색</span>
-                <input id="time-table-filter" type="search" placeholder="아이템 이름 또는 코드" />
+                <input id="time-table-filter" type="search" placeholder="아이템 이름" />
               </label>
               <div class="time-table-wrap">
                 <table class="mini-table time-mini-table">
                   <thead>
                     <tr>
                       <th>아이템</th>
-                      <th>코드</th>
-                      <th>종류</th>
                       <th>기본시간</th>
                     </tr>
                   </thead>
@@ -251,7 +244,7 @@
         <section class="calculator-card">
           <header class="calculator-header">
             <div>
-              <h2>스킬 포인트 계산기</h2>
+              <h2>성장 포션 계산기</h2>
               <p>성장포션 강화 단계에 따라 예상 레벨과 필요한 물약 수를 계산합니다.</p>
             </div>
           </header>

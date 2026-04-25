@@ -1,0 +1,1701 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-25T11:16:21.229Z",
+  "source": "alcanthia_index.js",
+  "timedItems": [
+    {
+      "code": "refined_fluorite",
+      "name": "가공된 형석",
+      "type": "general",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "refined_amber",
+      "name": "가공된 호박석",
+      "type": "general",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "engraving_stone",
+      "name": "각인석",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "space_knot",
+      "name": "공간의 매듭",
+      "type": "tool",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "frenzy_potion",
+      "name": "광폭포션",
+      "type": "potion",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "copper_cauldron",
+      "name": "구리 가마솥",
+      "type": "tool",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "dia_box_30",
+      "name": "구리 다이아 상자",
+      "type": "tool",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "copper_charm",
+      "name": "구리 단검",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "copper_scrap",
+      "name": "구리조각",
+      "type": "general",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "gold_cauldron",
+      "name": "금 가마솥",
+      "type": "tool",
+      "baseDurationMs": 240000
+    },
+    {
+      "code": "gilded_copper_ingot",
+      "name": "금동 주괴",
+      "type": "general",
+      "baseDurationMs": 90000
+    },
+    {
+      "code": "gilded_copper_helm",
+      "name": "금동 투구",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "golden_crystal",
+      "name": "금빛 결정",
+      "type": "general",
+      "baseDurationMs": 90000
+    },
+    {
+      "code": "golden_crown",
+      "name": "금빛 왕관",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "dia_box_700",
+      "name": "금제 다이아 상자",
+      "type": "tool",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "record_fragment_1",
+      "name": "기록 조각 1",
+      "type": "general",
+      "baseDurationMs": 0
+    },
+    {
+      "code": "record_fragment_2",
+      "name": "기록 조각 2",
+      "type": "general",
+      "baseDurationMs": 0
+    },
+    {
+      "code": "record_fragment_3",
+      "name": "기록 조각 3",
+      "type": "general",
+      "baseDurationMs": 0
+    },
+    {
+      "code": "record_fragment_4",
+      "name": "기록 조각 4",
+      "type": "general",
+      "baseDurationMs": 0
+    },
+    {
+      "code": "record_fragment_5",
+      "name": "기록 조각 5",
+      "type": "general",
+      "baseDurationMs": 0
+    },
+    {
+      "code": "shattered_tablet",
+      "name": "깨진 석판 조각",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "old_cauldron",
+      "name": "낡은 가마솥",
+      "type": "tool",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "sunset_bush_seed",
+      "name": "노을목 씨앗",
+      "type": "seed",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "sunset_fruit",
+      "name": "노을열매",
+      "type": "produce",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "sunset_leaf",
+      "name": "노을잎",
+      "type": "produce",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "sunset_potion",
+      "name": "노을포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "rusted_plate",
+      "name": "녹슨 갑주편",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "dia_scepter",
+      "name": "다이아 셉터",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "moonlight_candle",
+      "name": "달빛 양초",
+      "type": "tool",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "moonlight_mushroom",
+      "name": "달빛버섯",
+      "type": "produce",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "moonlight_mushroom_seed",
+      "name": "달빛버섯 씨앗",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "poison_flower_seed",
+      "name": "독꽃 씨앗",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "poison_petal",
+      "name": "독꽃잎",
+      "type": "produce",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "miasma_potion",
+      "name": "독안개포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "poison_fang",
+      "name": "독이빨",
+      "type": "general",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "gale_potion",
+      "name": "돌풍포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "mana_potion",
+      "name": "마나포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "witch_scarecrow",
+      "name": "마녀 허수아비",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "arcane_ring",
+      "name": "마력 반지",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "mana_pendant",
+      "name": "마력 펜던트",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "arcane_alloy",
+      "name": "마력 합금",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "mana_crystal",
+      "name": "마력결정",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "magic_glass",
+      "name": "마법 유리",
+      "type": "general",
+      "baseDurationMs": 5000
+    },
+    {
+      "code": "paralysis_potion",
+      "name": "마비포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "oblivion_orb",
+      "name": "망각의 오브",
+      "type": "tool",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "forgetting_potion",
+      "name": "망각포션",
+      "type": "potion",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "telescope",
+      "name": "망원경",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "venom_potion",
+      "name": "맹독포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "dream_potion",
+      "name": "몽환포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "breeze_potion",
+      "name": "미풍포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "wind_blossom_seed",
+      "name": "바람꽃 씨앗",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "wind_petal",
+      "name": "바람꽃잎",
+      "type": "produce",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "platinum_ingot",
+      "name": "백금 주괴",
+      "type": "general",
+      "baseDurationMs": 90000
+    },
+    {
+      "code": "platinum_breastplate",
+      "name": "백금 흉갑",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "daydream_potion",
+      "name": "백일몽포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "blank_rune",
+      "name": "백지의 룬",
+      "type": "tool",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "snake_scale",
+      "name": "뱀비늘",
+      "type": "general",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "star_flower_seed",
+      "name": "별꽃 씨앗",
+      "type": "seed",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "star_flower_dust",
+      "name": "별꽃가루",
+      "type": "produce",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "star_crystal",
+      "name": "별의 결정",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "star_music_box",
+      "name": "별조각 오르골",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "restored_tablet",
+      "name": "복원된 석판",
+      "type": "general",
+      "baseDurationMs": 0
+    },
+    {
+      "code": "corrosion_potion",
+      "name": "부식포션",
+      "type": "potion",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "fire_vine_seed",
+      "name": "불씨덩굴 씨앗",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "ember_fruit",
+      "name": "불씨열매",
+      "type": "produce",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "opaque_sediment",
+      "name": "불투명한 침전물",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "red_flower_seed",
+      "name": "붉은꽃 씨앗",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "red_flower_leaf",
+      "name": "붉은꽃잎",
+      "type": "produce",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "scale_bracelet",
+      "name": "비늘 팔찌",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "dia_box_2000",
+      "name": "빛나는 다이아 상자",
+      "type": "tool",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "guild_endorsement",
+      "name": "상인 길드 추천서",
+      "type": "tool",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "sunset_glow_potion",
+      "name": "석양포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "tablet_shield",
+      "name": "석판 방패",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "growth_potion",
+      "name": "성장포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "dissipation_potion",
+      "name": "소산포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "crystal_fountain",
+      "name": "수정 분수",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "aging_sunset_bush_seed",
+      "name": "시험용 노을목 씨앗",
+      "type": "seed",
+      "baseDurationMs": 5000
+    },
+    {
+      "code": "aging_red_flower_seed",
+      "name": "시험용 붉은꽃 씨앗",
+      "type": "seed",
+      "baseDurationMs": 5000
+    },
+    {
+      "code": "mirage_potion",
+      "name": "신기루포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "mist_horn",
+      "name": "안개 나팔",
+      "type": "tool",
+      "baseDurationMs": 5000
+    },
+    {
+      "code": "mist_potion",
+      "name": "안개포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "herb",
+      "name": "약초",
+      "type": "produce",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "herb_seed",
+      "name": "약초 씨앗",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "plague_potion",
+      "name": "역병포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "heatwave_potion",
+      "name": "열풍포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "foresight_potion",
+      "name": "예지포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "fairy_lantern",
+      "name": "요정 등불",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "courage_potion",
+      "name": "용기포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "lava_insignia",
+      "name": "용암 휘장",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "lava_essence",
+      "name": "용암정수",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "lava_core",
+      "name": "용암핵",
+      "type": "general",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "dissolution_potion",
+      "name": "용해포션",
+      "type": "potion",
+      "baseDurationMs": 240000
+    },
+    {
+      "code": "meteor_potion",
+      "name": "유성포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "silver_cauldron",
+      "name": "은 가마솥",
+      "type": "tool",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "silver_ore",
+      "name": "은광석",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "silver_crystal",
+      "name": "은빛 결정",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "silver_cloak",
+      "name": "은빛 망토",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "silver_necklace",
+      "name": "은빛 방패",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "stealth_potion",
+      "name": "은신포션",
+      "type": "potion",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "dia_box_200",
+      "name": "은제 다이아 상자",
+      "type": "tool",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "moss_jelly",
+      "name": "이끼젤리",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "dew_root_blub",
+      "name": "이슬뿌리 구근",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "afterimage_potion",
+      "name": "잔상포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "resistance_potion",
+      "name": "저항포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "pedestal",
+      "name": "전시대",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "slime_potion",
+      "name": "점액포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "purification_potion",
+      "name": "정화포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "poison_potion",
+      "name": "중독포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "steam_potion",
+      "name": "증기포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "mud",
+      "name": "진흙",
+      "type": "general",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "mud_mask",
+      "name": "진흙 가면",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "gust_potion",
+      "name": "질풍포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "beast_horn",
+      "name": "짐승뿔",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "red_essence",
+      "name": "촉진포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "blessing_potion",
+      "name": "축복포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "explosion_potion",
+      "name": "폭발포션",
+      "type": "potion",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "blue_moss",
+      "name": "푸른이끼",
+      "type": "produce",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "blue_moss_spore",
+      "name": "푸른이끼 포자",
+      "type": "seed",
+      "baseDurationMs": 15000
+    },
+    {
+      "code": "alloy_epaulette",
+      "name": "합금 견장",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "alloy_ingot",
+      "name": "합금 주괴",
+      "type": "general",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "antidote_potion",
+      "name": "해독포션",
+      "type": "potion",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "sunlight_flower_seed",
+      "name": "햇살꽃 씨앗",
+      "type": "seed",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "fluorite",
+      "name": "형석 원석",
+      "type": "general",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "comet_potion",
+      "name": "혜성포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "amber_stone",
+      "name": "호박석 원석",
+      "type": "general",
+      "baseDurationMs": 120000
+    },
+    {
+      "code": "fire_potion",
+      "name": "화염포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "hallucination_spore",
+      "name": "환각포자",
+      "type": "potion",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "illusion_fern_seed",
+      "name": "환영고사리 씨앗",
+      "type": "seed",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "illusion_sprout",
+      "name": "환영잎",
+      "type": "produce",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "phantom_potion",
+      "name": "환영포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "vitality_elixir",
+      "name": "활력포션",
+      "type": "potion",
+      "baseDurationMs": 30000
+    },
+    {
+      "code": "golden_charm",
+      "name": "황금 부적",
+      "type": "equipment",
+      "baseDurationMs": 60000
+    },
+    {
+      "code": "gold_nugget",
+      "name": "황금덩어리",
+      "type": "general",
+      "baseDurationMs": 90000
+    },
+    {
+      "code": "rejuvenation_potion",
+      "name": "회생포션",
+      "type": "potion",
+      "baseDurationMs": 180000
+    },
+    {
+      "code": "herbal_tonic",
+      "name": "힐링포션",
+      "type": "potion",
+      "baseDurationMs": 15000
+    }
+  ],
+  "brewRecipes": [
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "herb"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "herbal_tonic"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "red_flower_leaf"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "red_essence"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "blue_moss",
+        "blue_moss"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "moss_jelly"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "poison_petal",
+        "poison_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "poison_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "poison_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "paralysis_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "blue_moss",
+        "poison_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "slime_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "moonlight_mushroom",
+        "moonlight_mushroom"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "hallucination_spore"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "red_flower_leaf"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "growth_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "blue_moss"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "mana_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "blue_moss"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "vitality_elixir"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "poison_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "venom_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "moonlight_mushroom"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "antidote_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "moonlight_mushroom"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "frenzy_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "blue_moss",
+        "moonlight_mushroom"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "stealth_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "moonlight_mushroom",
+        "poison_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "corrosion_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "star_flower_dust"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "blessing_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "star_flower_dust"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "courage_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "blue_moss",
+        "star_flower_dust"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "purification_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "poison_petal",
+        "star_flower_dust"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "dream_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "moonlight_mushroom",
+        "star_flower_dust"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "foresight_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "star_flower_dust",
+        "star_flower_dust"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "star_crystal"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "ember_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "resistance_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "blue_moss",
+        "ember_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "steam_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "poison_petal",
+        "ember_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "plague_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "moonlight_mushroom",
+        "ember_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "explosion_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "star_flower_dust",
+        "ember_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "meteor_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "ember_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "fire_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "ember_fruit",
+        "ember_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "lava_essence"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "breeze_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "gust_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "blue_moss",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "mist_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "poison_petal",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "miasma_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "moonlight_mushroom",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "phantom_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "star_flower_dust",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "comet_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "ember_fruit",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "heatwave_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "wind_petal",
+        "wind_petal"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "gale_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "illusion_sprout"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "afterimage_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "blue_moss",
+        "illusion_sprout"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "mirage_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "moonlight_mushroom",
+        "illusion_sprout"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "daydream_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "wind_petal",
+        "illusion_sprout"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "dissipation_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "herb",
+        "sunset_leaf"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "rejuvenation_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "red_flower_leaf",
+        "sunset_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "sunset_glow_potion"
+      ]
+    },
+    {
+      "kind": "potion",
+      "inputs": [
+        "sunset_leaf",
+        "sunset_fruit"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "sunset_potion"
+      ]
+    }
+  ],
+  "craftRecipes": [
+    {
+      "kind": "engrave",
+      "inputs": [
+        "mud",
+        "engraving_stone"
+      ],
+      "requiredLevel": 1,
+      "outputs": [
+        "mud_mask"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "copper_scrap",
+        "engraving_stone"
+      ],
+      "requiredLevel": 1,
+      "outputs": [
+        "copper_charm"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "snake_scale",
+        "engraving_stone"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "scale_bracelet"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "silver_ore",
+        "engraving_stone"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "silver_necklace"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "mana_crystal",
+        "engraving_stone"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "mana_pendant"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "gold_nugget",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "golden_charm"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "lava_core",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "lava_insignia"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "alloy_ingot",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "alloy_epaulette"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "arcane_alloy",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "arcane_ring"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "silver_crystal",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "silver_cloak"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "gilded_copper_ingot",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "gilded_copper_helm"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "platinum_ingot",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "platinum_breastplate"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "golden_crystal",
+        "engraving_stone"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "golden_crown"
+      ]
+    },
+    {
+      "kind": "engrave",
+      "inputs": [
+        "restored_tablet",
+        "engraving_stone"
+      ],
+      "requiredLevel": 4,
+      "outputs": [
+        "tablet_shield"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "copper_scrap",
+        "mud"
+      ],
+      "requiredLevel": 1,
+      "outputs": [
+        "copper_cauldron"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "silver_ore",
+        "mud"
+      ],
+      "requiredLevel": 5,
+      "outputs": [
+        "silver_cauldron"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "golden_crystal",
+        "mud"
+      ],
+      "requiredLevel": 7,
+      "outputs": [
+        "gold_cauldron"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "copper_cauldron",
+        "old_cauldron"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "copper_cauldron"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "old_cauldron",
+        "copper_scrap"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "copper_cauldron"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "copper_scrap",
+        "silver_ore"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "alloy_ingot"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "copper_scrap",
+        "mana_crystal"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "arcane_alloy"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "mana_crystal",
+        "silver_ore"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "silver_crystal"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "copper_scrap",
+        "gold_nugget"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "gilded_copper_ingot"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "silver_ore",
+        "gold_nugget"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "platinum_ingot"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "mana_crystal",
+        "gold_nugget"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "golden_crystal"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "fluorite",
+        "mana_crystal"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "refined_fluorite"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "amber_stone",
+        "mana_crystal"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "refined_amber"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "shattered_tablet",
+        "foresight_potion"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "restored_tablet"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "rusted_plate",
+        "heatwave_potion"
+      ],
+      "requiredLevel": 2,
+      "outputs": [
+        "platinum_ingot"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "rusted_plate",
+        "corrosion_potion"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "copper_scrap"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "shattered_tablet",
+        "mana_potion"
+      ],
+      "requiredLevel": 0,
+      "outputs": [
+        "mana_crystal"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "magic_glass",
+        "refined_fluorite"
+      ],
+      "requiredLevel": 5,
+      "outputs": [
+        "fairy_lantern"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "magic_glass",
+        "mana_crystal"
+      ],
+      "requiredLevel": 5,
+      "outputs": [
+        "crystal_fountain"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "magic_glass",
+        "beast_horn"
+      ],
+      "requiredLevel": 5,
+      "outputs": [
+        "witch_scarecrow"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "magic_glass",
+        "star_flower_dust"
+      ],
+      "requiredLevel": 3,
+      "outputs": [
+        "star_music_box"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "magic_glass",
+        "silver_ore"
+      ],
+      "requiredLevel": 5,
+      "outputs": [
+        "pedestal"
+      ]
+    },
+    {
+      "kind": "craft",
+      "inputs": [
+        "magic_glass",
+        "gilded_copper_ingot"
+      ],
+      "requiredLevel": 5,
+      "outputs": [
+        "telescope"
+      ]
+    }
+  ]
+}

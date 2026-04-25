@@ -229,9 +229,9 @@ const TOOLS = [
 const cropById = new Map([...CROPS, ...TOOLS].map((crop) => [crop.id, crop]));
 const cropImageCache = new Map();
 const CAULDRON_TIERS = [
-  { id: "gold", name: "금 가마솥", icon: "금", iconClass: "gold" },
-  { id: "silver", name: "은 가마솥", icon: "은", iconClass: "silver" },
-  { id: "copper", name: "동 가마솥", icon: "동", iconClass: "copper" },
+  { id: "gold", name: "금 가마솥", iconPath: "./cauldron_icons/gold_cauldron.png" },
+  { id: "silver", name: "은 가마솥", iconPath: "./cauldron_icons/silver_cauldron.png" },
+  { id: "copper", name: "동 가마솥", iconPath: "./cauldron_icons/copper_cauldron.png" },
 ];
 const CROP_PRODUCTION_MATERIALS = {
   "red-leaf": "붉은꽃잎",
@@ -470,7 +470,6 @@ const timeStatusBanner = document.getElementById("time-status-banner");
 const timeOperationModeSelect = document.getElementById("time-operation-mode");
 const timeCauldronEnhancementInput = document.getElementById("time-cauldron-enhancement");
 const timeFlameMasteryInput = document.getElementById("time-flame-mastery");
-const timeFirePotionLevelInput = document.getElementById("time-fire-potion-level");
 const timeItemASelect = document.getElementById("time-item-a-select");
 const timeItemBSelect = document.getElementById("time-item-b-select");
 const timeItemAEnhancementInput = document.getElementById("time-item-a-enhancement");
@@ -622,6 +621,35 @@ for (const theme of Object.values(SKILL_CATEGORY_THEMES)) {
   }
 }
 const SKILL_LANE_LABELS = ["기초", "전개", "심화", "핵심", "완성", "초월"];
+const DEFAULT_WITCH_TITLE = { id: "default", name: "견습 마녀", tier: "default" };
+const SKILLED_WITCH_TITLES = {
+  farming: { id: "farmer", name: "농부", tier: "skilled" },
+  brewing: { id: "alchemist", name: "연금술사", tier: "skilled" },
+  mana: { id: "mage", name: "마법사", tier: "skilled" },
+  contract: { id: "employer", name: "고용주", tier: "skilled" },
+};
+const SKILLED_WITCH_TITLE_COMBOS = {
+  "brewing+farming": { id: "elixirist", name: "비약술사", tier: "skilled" },
+  "farming+mana": { id: "spiritist", name: "정령술사", tier: "skilled" },
+  "contract+farming": { id: "lord", name: "영주", tier: "skilled" },
+  "brewing+mana": { id: "arcanist", name: "비전술사", tier: "skilled" },
+  "brewing+contract": { id: "merchant", name: "상인", tier: "skilled" },
+  "contract+mana": { id: "summoner", name: "소환사", tier: "skilled" },
+};
+const MASTER_WITCH_TITLES = {
+  farming: { id: "godmother", name: "대모", tier: "master" },
+  brewing: { id: "apothecary", name: "영약사", tier: "master" },
+  mana: { id: "archmage", name: "대마법사", tier: "master" },
+  contract: { id: "sovereign", name: "군주", tier: "master" },
+};
+const MASTER_WITCH_TITLE_COMBOS = {
+  "brewing+farming": { id: "gaia", name: "가이아", tier: "master" },
+  "farming+mana": { id: "yggdrasil", name: "이그드라실", tier: "master" },
+  "contract+farming": { id: "overlord", name: "오버로드", tier: "master" },
+  "brewing+mana": { id: "master_arcanist", name: "아르카니스트", tier: "master" },
+  "brewing+contract": { id: "maestro", name: "마에스트로", tier: "master" },
+  "contract+mana": { id: "master_archmage", name: "아크메이지", tier: "master" },
+};
 const CENTER_CELL = { col: 3, row: 3 };
 const BASE_BOUNDS = {
   minCol: 0,
@@ -640,6 +668,7 @@ const state = {
   activeSlotMode: "layout",
   recipes: [],
   potionRecipes: [],
+  cauldronRecipes: [],
   timedItems: [],
   timedItemByCode: new Map(),
   skills: [],
@@ -670,7 +699,6 @@ const state = {
     operationMode: "auto",
     cauldronEnhancement: 0,
     flameMastery: 0,
-    firePotionLevel: -1,
     itemACode: "",
     itemBCode: "",
     itemAEnhancement: 0,
@@ -1495,145 +1523,15 @@ function syncTimeCalculatorSkillsFromTree() {
 }
 
 async function loadTimeGameIndex() {
-  const response = await fetch("./alcanthia_index.js", { cache: "no-store" });
+  const response = await fetch("./alcanthia_time_data.json", { cache: "no-store" });
   if (!response.ok) {
-    throw new Error("alcanthia_index.js를 불러오지 못했습니다.");
+    throw new Error("?? ?? ??? ??? ???? ?????.");
   }
-  return response.text();
-}
-
-function findMatchingSymbol(source, startIndex, openChar, closeChar) {
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = startIndex; index < source.length; index += 1) {
-    const char = source[index];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === openChar) {
-      depth += 1;
-      continue;
-    }
-
-    if (char === closeChar) {
-      depth -= 1;
-      if (depth === 0) {
-        return index;
-      }
-    }
-  }
-
-  return -1;
-}
-
-function extractAssignedBracketExpression(source, name) {
-  const assignIndex = source.indexOf(`${name}=`);
-  if (assignIndex === -1) {
-    throw new Error(`${name} 레시피 정의를 찾지 못했습니다.`);
-  }
-
-  const openIndex = source.indexOf("[", assignIndex);
-  const closeIndex = findMatchingSymbol(source, openIndex, "[", "]");
-  if (openIndex === -1 || closeIndex === -1) {
-    throw new Error(`${name} 레시피 배열을 읽지 못했습니다.`);
-  }
-
-  return source.slice(openIndex, closeIndex + 1);
-}
-
-function extractTimedItemsFromSource(source) {
-  const items = [];
-  const seen = new Set();
-  const keyRegex = /([A-Za-z0-9_]+):\{/g;
-  let match;
-
-  while ((match = keyRegex.exec(source)) !== null) {
-    const code = match[1];
-    const bodyStart = match.index + match[0].length - 1;
-    const bodyEnd = findMatchingSymbol(source, bodyStart, "{", "}");
-
-    if (bodyEnd === -1) {
-      continue;
-    }
-
-    const body = source.slice(bodyStart + 1, bodyEnd);
-    if (!body.includes('brewDuration:') || !body.includes('name:"')) {
-      continue;
-    }
-
-    const nameMatch = body.match(/name:"([^"]+)"/);
-    const typeMatch = body.match(/type:"([^"]+)"/);
-    const durationMatch = body.match(/brewDuration:([^,}]+)/);
-
-    if (!nameMatch || !durationMatch || seen.has(code)) {
-      continue;
-    }
-
-    const baseDurationMs = Function("zn", `return (${durationMatch[1].trim()});`)(MINUTE_MILLIS);
-
-    items.push({
-      code,
-      name: nameMatch[1],
-      type: typeMatch ? typeMatch[1] : "unknown",
-      baseDurationMs,
-    });
-
-    seen.add(code);
-    keyRegex.lastIndex = bodyEnd;
-  }
-
-  return items;
+  return response.json();
 }
 
 function buildTimeRecipeKey(codeA, codeB) {
   return [codeA, codeB].sort().join("::");
-}
-
-function extractTimeRecipesFromSource(source) {
-  const brewingExpression = extractAssignedBracketExpression(source, "Lo");
-  const engravingExpression = extractAssignedBracketExpression(source, "k1");
-  const allRecipeExpression = extractAssignedBracketExpression(source, "dh");
-  const evaluator = Function(`
-    const Lo = ${brewingExpression};
-    const k1 = ${engravingExpression};
-    const dh = ${allRecipeExpression};
-    return { Lo, dh };
-  `);
-  const { Lo, dh } = evaluator();
-
-  const brewRecipes = Lo.map(([inputs, output]) => ({
-    kind: "potion",
-    inputs: [...inputs],
-    requiredLevel: 0,
-    outputs: [output],
-  }));
-  const craftRecipes = dh.slice(Lo.length).map((recipe) => ({
-    kind: recipe.inputs.includes("engraving_stone") ? "engrave" : "craft",
-    inputs: [...recipe.inputs],
-    requiredLevel: recipe.requiredLevel ?? 0,
-    outputs: [...recipe.outputs],
-  }));
-  const recipeByKey = new Map(
-    [...brewRecipes, ...craftRecipes].map((recipe) => [buildTimeRecipeKey(recipe.inputs[0], recipe.inputs[1]), recipe]),
-  );
-
-  return { brewRecipes, craftRecipes, recipeByKey };
 }
 
 function findMatchingTimeRecipe(itemA, itemB) {
@@ -2008,21 +1906,7 @@ function renderRecipeCalculator() {
 }
 
 async function loadRecipes() {
-  try {
-    const response = await fetch("./조합법.csv", { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error("Recipe csv load failed");
-    }
-
-    state.recipes = parseRecipeCsv(await response.text());
-    recipeTargetSelect.innerHTML = "";
-    renderRecipeCalculator();
-    renderMaterialCalculator();
-  } catch (error) {
-    recipeSummary.innerHTML = `<p>조합법.csv를 불러오지 못했습니다.</p>`;
-    recipeBreakdown.innerHTML = "";
-    recipeList.innerHTML = "";
-  }
+  renderRecipeCalculator();
 }
 
 function allCraftItemOptions() {
@@ -2035,8 +1919,94 @@ function allCraftItemOptions() {
   return [...items.entries()].sort((a, b) => a[1].localeCompare(b[1], "ko"));
 }
 
+function timeItemNameByCode(code) {
+  return state.timedItemByCode.get(code)?.name ?? code;
+}
+
+function buildRecipeCalculatorRecipesFromTimeData() {
+  return state.timeCraftRecipes
+    .map((recipe) => {
+      const inputA = state.timedItemByCode.get(recipe.inputs[0]);
+      const inputB = state.timedItemByCode.get(recipe.inputs[1]);
+      const outputCode = Array.isArray(recipe.outputs) ? recipe.outputs[0] ?? "" : "";
+      const outputItem = state.timedItemByCode.get(outputCode);
+      if (!inputA || !inputB || !outputItem) {
+        return null;
+      }
+
+      return {
+        material1: inputA.name,
+        material2: inputB.name,
+        result: outputItem.name,
+        requiredLevel: Number(recipe.requiredLevel) || 0,
+        key1: inputA.code,
+        key2: inputB.code,
+        resultKey: outputItem.code,
+        kind: recipe.kind ?? "craft",
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.result.localeCompare(right.result, "ko"));
+}
+
+function buildCauldronRecipesFromTimeData() {
+  const recipes = [];
+  const pushRecipe = (kind, recipe, index) => {
+    const inputA = state.timedItemByCode.get(recipe.inputs[0]);
+    const inputB = state.timedItemByCode.get(recipe.inputs[1]);
+    if (!inputA || !inputB) {
+      return;
+    }
+
+    const outputCodes = Array.isArray(recipe.outputs) ? recipe.outputs : [];
+    const outputNames = outputCodes.map((code) => timeItemNameByCode(code));
+    const value = `${kind}:${recipe.inputs.join("+")}=>${outputCodes.join("+") || index}`;
+    recipes.push({
+      kind,
+      value,
+      id: value,
+      outputCode: outputCodes[0] ?? "",
+      outputName: outputNames.join(", ") || `${timeItemNameByCode(recipe.inputs[0])} 조합`,
+      name: outputNames.join(", ") || `${timeItemNameByCode(recipe.inputs[0])} 조합`,
+      material1: inputA.name,
+      material2: inputB.name,
+      inputCodes: [...recipe.inputs],
+      outputCodes,
+      requiredLevel: recipe.requiredLevel ?? 0,
+      durationSeconds: Math.max(inputA.baseDurationMs, inputB.baseDurationMs) / MILLIS_IN_SECOND,
+    });
+  };
+
+  state.timeBrewingRecipes.forEach((recipe, index) => pushRecipe("potion", recipe, index));
+  state.timeCraftRecipes.forEach((recipe, index) => pushRecipe(recipe.kind ?? "craft", recipe, index));
+
+  return recipes;
+}
+
+function normalizeCauldronRecipes() {
+  const available = new Set(state.cauldronRecipes.map((recipe) => recipe.value));
+  const fallback = state.cauldronRecipes[0]?.value ?? "";
+  CAULDRON_TIERS.forEach((tier) => {
+    state.cauldrons[tier.id].forEach((cauldron) => {
+      if (!available.has(cauldron.recipeValue)) {
+        cauldron.recipeValue = fallback;
+      }
+    });
+  });
+}
+
+function activeFlameMasteryLevel() {
+  return getSkillLevel(normalizeSkillName(TIME_RELEVANT_SKILL_KEYS.flameMastery));
+}
+
+function effectiveCauldronRecipeSeconds(recipe, cauldronLevel) {
+  const baseDurationMs = Math.max(0, Number(recipe.durationSeconds) || 0) * MILLIS_IN_SECOND;
+  const flameReduction = flameMasteryReduction(activeFlameMasteryLevel(), cauldronLevel);
+  return Math.round(baseDurationMs * (1 - flameReduction)) / MILLIS_IN_SECOND;
+}
+
 function defaultCauldronRecipeValue() {
-  return state.potionRecipes[0] ? `potion:${state.potionRecipes[0].id}` : "";
+  return state.cauldronRecipes[0]?.value ?? "";
 }
 
 function createCauldron(tierId) {
@@ -2054,47 +2024,31 @@ function addCauldron(tierId) {
 }
 
 function recipeSelectOptions(selectedValue) {
-  const potionOptions = state.potionRecipes
-    .map((recipe) => `<option value="potion:${recipe.id}">${recipe.name}</option>`)
+  const potionOptions = state.cauldronRecipes
+    .filter((recipe) => recipe.kind === "potion")
+    .map((recipe) => `<option value="${recipe.value}">${recipe.name}</option>`)
     .join("");
-  const craftOptions = state.recipes
-    .map((recipe) => `<option value="craft:${recipe.resultKey}">${recipe.result}</option>`)
+  const craftOptions = state.cauldronRecipes
+    .filter((recipe) => recipe.kind === "craft")
+    .map((recipe) => `<option value="${recipe.value}">${recipe.name}</option>`)
     .join("");
-  const enhanceOptions = allCraftItemOptions()
-    .map(([key, name]) => `<option value="enhance:${key}">${name} +1강</option>`)
+  const engraveOptions = state.cauldronRecipes
+    .filter((recipe) => recipe.kind === "engrave")
+    .map((recipe) => `<option value="${recipe.value}">${recipe.name}</option>`)
     .join("");
 
   const html = `
     <optgroup label="양조">${potionOptions}</optgroup>
-    <optgroup label="강화">${enhanceOptions}</optgroup>
     <optgroup label="조합">${craftOptions}</optgroup>
+    <optgroup label="각인">${engraveOptions}</optgroup>
   `;
 
   return html.replace(`value="${selectedValue}"`, `value="${selectedValue}" selected`);
 }
 
 function selectedRecipeDetails(value) {
-  const [type, id] = String(value || "").split(":");
-  if (type === "potion") {
-    const recipe = state.potionRecipes.find((candidate) => candidate.id === id);
-    return recipe ? { type, recipe } : null;
-  }
-
-  if (type === "craft") {
-    const recipe = recipeSourceMap().get(id);
-    return recipe ? { type, recipe } : null;
-  }
-
-  if (type === "enhance") {
-    return { type, recipe: { name: itemDisplayName(id) } };
-  }
-
-  return null;
-}
-
-function effectiveRecipeSeconds(baseSeconds, level) {
-  const multiplier = Math.max(0.05, 1 - Math.max(0, level) * 0.05);
-  return baseSeconds * multiplier;
+  const recipe = state.cauldronRecipes.find((candidate) => candidate.value === value);
+  return recipe ? { type: recipe.kind, recipe } : null;
 }
 
 function formatNumber(value, maximumFractionDigits = 2) {
@@ -2106,20 +2060,19 @@ function renderCauldronCard(tier, cauldron) {
   const level = Math.max(0, Number(cauldron.level) || 0);
   let meta = "레시피를 선택해주세요.";
 
-  if (selected?.type === "potion") {
-    const seconds = effectiveRecipeSeconds(selected.recipe.durationSeconds, level);
+  if (selected?.recipe) {
+    const seconds = effectiveCauldronRecipeSeconds(selected.recipe, level);
     const cyclesPerHour = seconds > 0 ? 3600 / seconds : 0;
-    meta = `${selected.recipe.material1} + ${selected.recipe.material2} · ${formatNumber(seconds, 1)}초/회 · 시간당 ${formatNumber(cyclesPerHour, 2)}회`;
-  } else if (selected?.type === "craft") {
-    meta = `${selected.recipe.material1} + ${selected.recipe.material2} · 조합 소요 시간 데이터가 없어 집계 제외`;
-  } else if (selected?.type === "enhance") {
-    meta = `동일 아이템 2개 사용 · 강화 소요 시간 데이터가 없어 집계 제외`;
+    meta = `${selected.recipe.material1} + ${selected.recipe.material2} → ${selected.recipe.outputName} · ${formatNumber(seconds, 1)}초/회 · 시간당 ${formatNumber(cyclesPerHour, 2)}회`;
   }
 
   return `
     <article class="cauldron-card" data-tier="${tier.id}" data-id="${cauldron.id}">
       <div class="cauldron-card-header">
-        <strong><span class="${tier.iconClass}">${tier.icon}</span> ${tier.name}</strong>
+        <strong>
+          <img class="cauldron-tier-icon" src="${tier.iconPath}" alt="${tier.name}" />
+          ${tier.name}
+        </strong>
         <button class="cauldron-delete" type="button" data-action="delete-cauldron" aria-label="가마솥 삭제">삭제</button>
       </div>
       <div class="cauldron-controls">
@@ -2145,11 +2098,11 @@ function collectHourlyMaterialUsage() {
   CAULDRON_TIERS.forEach((tier) => {
     state.cauldrons[tier.id].forEach((cauldron) => {
       const selected = selectedRecipeDetails(cauldron.recipeValue);
-      if (selected?.type !== "potion" || selected.recipe.durationSeconds <= 0) {
+      if (!selected?.recipe || selected.recipe.durationSeconds <= 0) {
         return;
       }
 
-      const seconds = effectiveRecipeSeconds(selected.recipe.durationSeconds, cauldron.level);
+      const seconds = effectiveCauldronRecipeSeconds(selected.recipe, cauldron.level);
       const cyclesPerHour = seconds > 0 ? 3600 / seconds : 0;
       [selected.recipe.material1, selected.recipe.material2].forEach((material) => {
         usage.set(material, (usage.get(material) ?? 0) + cyclesPerHour);
@@ -2286,8 +2239,8 @@ function renderMaterialCalculator() {
     return;
   }
 
-  if (!state.potionRecipes.length) {
-    cauldronBoard.innerHTML = `<div class="result-card"><p>포션.csv를 불러오는 중입니다.</p></div>`;
+  if (!state.cauldronRecipes.length) {
+    cauldronBoard.innerHTML = `<div class="result-card"><p>원본 앱 레시피를 불러오는 중입니다.</p></div>`;
     materialUsageSummary.innerHTML = "";
     return;
   }
@@ -2307,7 +2260,10 @@ function renderMaterialCalculator() {
     return `
       <section class="cauldron-row" data-tier="${tier.id}">
         <div class="cauldron-row-header">
-          <h3>${tier.name}</h3>
+          <h3>
+            <img class="cauldron-tier-icon" src="${tier.iconPath}" alt="${tier.name}" />
+            ${tier.name}
+          </h3>
           <button type="button" data-action="add-cauldron" data-tier="${tier.id}">+</button>
         </div>
         <div class="cauldron-list">
@@ -2327,59 +2283,94 @@ function renderMaterialCalculator() {
   renderMaterialUsageSummary();
 }
 
-async function loadPotionRecipes() {
+function loadPotionRecipes() {
+  renderMaterialCalculator();
+  renderSkillPointCalculator();
+}
+
+async function initializeTimeCalculatorData() {
+  setTimeStatus("loading", "???? ???? ???? ????.");
+
   try {
-    const response = await fetch("./포션.csv", { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error("Potion csv load failed");
+    const data = await loadTimeGameIndex();
+    const timedItems = Array.isArray(data?.timedItems) ? data.timedItems : [];
+    const brewRecipes = Array.isArray(data?.brewRecipes) ? data.brewRecipes : [];
+    const craftRecipes = Array.isArray(data?.craftRecipes) ? data.craftRecipes : [];
+
+    state.timedItems = timedItems
+      .map((item) => ({
+        code: item.code,
+        name: item.name,
+        type: item.type ?? "unknown",
+        baseDurationMs: Number(item.baseDurationMs) || 0,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name, "ko") || left.code.localeCompare(right.code, "ko"));
+    state.timedItemByCode = new Map(state.timedItems.map((item) => [item.code, item]));
+
+    state.timeBrewingRecipes = brewRecipes.map((recipe) => ({
+      kind: recipe.kind ?? "potion",
+      inputs: [...recipe.inputs],
+      requiredLevel: recipe.requiredLevel ?? 0,
+      outputs: [...recipe.outputs],
+    }));
+    state.timeCraftRecipes = craftRecipes.map((recipe) => ({
+      kind: recipe.kind ?? (recipe.inputs?.includes("engraving_stone") ? "engrave" : "craft"),
+      inputs: [...recipe.inputs],
+      requiredLevel: recipe.requiredLevel ?? 0,
+      outputs: [...recipe.outputs],
+    }));
+    state.timeRecipeByKey = new Map(
+      [...state.timeBrewingRecipes, ...state.timeCraftRecipes].map((recipe) => [
+        buildTimeRecipeKey(recipe.inputs[0], recipe.inputs[1]),
+        recipe,
+      ]),
+    );
+
+    if (!state.timedItems.length || !state.timeBrewingRecipes.length || !state.timeCraftRecipes.length) {
+      throw new Error("?? ?? ???? ?? ????.");
     }
 
-    state.potionRecipes = parsePotionCsv(await response.text());
+    state.cauldronRecipes = buildCauldronRecipesFromTimeData();
+    state.recipes = buildRecipeCalculatorRecipesFromTimeData();
+    state.potionRecipes = state.cauldronRecipes
+      .filter((recipe) => recipe.kind === "potion")
+      .map((recipe) => ({
+        id: recipe.id,
+        name: recipe.name,
+        material1: recipe.material1,
+        material2: recipe.material2,
+        durationSeconds: recipe.durationSeconds,
+      }));
     CAULDRON_TIERS.forEach((tier) => {
       if (!state.cauldrons[tier.id].length) {
         state.cauldrons[tier.id].push(createCauldron(tier.id));
       }
     });
-    renderMaterialCalculator();
-    renderSkillPointCalculator();
-  } catch (error) {
-    cauldronBoard.innerHTML = `<div class="result-card"><p>포션.csv를 불러오지 못했습니다.</p></div>`;
-    materialUsageSummary.innerHTML = "";
-  }
-}
-
-async function initializeTimeCalculatorData() {
-  setTimeStatus("loading", "원본 앱 데이터에서 시간표와 레시피를 불러오는 중입니다.");
-
-  try {
-    const source = await loadTimeGameIndex();
-    state.timedItems = extractTimedItemsFromSource(source).sort(
-      (left, right) => left.name.localeCompare(right.name, "ko") || left.code.localeCompare(right.code, "ko"),
-    );
-    state.timedItemByCode = new Map(state.timedItems.map((item) => [item.code, item]));
-
-    const recipes = extractTimeRecipesFromSource(source);
-    state.timeBrewingRecipes = recipes.brewRecipes;
-    state.timeCraftRecipes = recipes.craftRecipes;
-    state.timeRecipeByKey = recipes.recipeByKey;
+    normalizeCauldronRecipes();
+    if (!state.recipes.some((recipe) => recipe.resultKey === recipeTargetSelect.value)) {
+      recipeTargetSelect.innerHTML = "";
+    }
 
     if (!state.timeCalculatorInputs.itemACode || !state.timedItemByCode.has(state.timeCalculatorInputs.itemACode)) {
-      state.timeCalculatorInputs.itemACode = state.timedItems.find((item) => item.name === "약초")?.code ?? state.timedItems[0]?.code ?? "";
+      state.timeCalculatorInputs.itemACode = state.timedItemByCode.has("herb") ? "herb" : state.timedItems[0]?.code ?? "";
     }
     if (!state.timeCalculatorInputs.itemBCode || !state.timedItemByCode.has(state.timeCalculatorInputs.itemBCode)) {
       state.timeCalculatorInputs.itemBCode =
-        state.timedItems.find((item) => item.name === "푸른이끼")?.code ?? state.timedItems[1]?.code ?? state.timedItems[0]?.code ?? "";
+        state.timedItemByCode.has("red_flower_leaf") ? "red_flower_leaf" : state.timedItems[1]?.code ?? state.timedItems[0]?.code ?? "";
     }
 
     populateTimeItemSelectors();
     syncTimeCalculatorInputs();
     renderTimeDurationTable();
+    renderRecipeCalculator();
+    renderMaterialCalculator();
+    renderSkillPointCalculator();
     updateTimeCalculator();
-    setTimeStatus(
-      "ready",
-      `원본 앱 기준 기본시간 ${formatNumber(state.timedItems.length, 0)}개, 양조 ${formatNumber(state.timeBrewingRecipes.length, 0)}개, 제작 ${formatNumber(state.timeCraftRecipes.length, 0)}개를 불러왔습니다.`,
-    );
+    setTimeStatus("ready", "");
   } catch (error) {
+    state.recipes = [];
+    state.cauldronRecipes = [];
+    state.potionRecipes = [];
     state.timedItems = [...STATIC_TIMED_ITEMS].sort(
       (left, right) => left.name.localeCompare(right.name, "ko") || left.code.localeCompare(right.code, "ko"),
     );
@@ -2390,7 +2381,8 @@ async function initializeTimeCalculatorData() {
     populateTimeItemSelectors();
     syncTimeCalculatorInputs();
     renderTimeDurationTable();
-    setTimeStatus("error", `원본 앱 레시피를 불러오지 못했습니다: ${error.message}`);
+    renderRecipeCalculator();
+    setTimeStatus("error", `?? ?? ???? ???? ?????: ${error.message}`);
   }
 }
 
@@ -2411,15 +2403,23 @@ function setTimeStatus(type, message) {
   timeStatusBanner.textContent = message;
 }
 
+function shouldHideTimeItem(item) {
+  const name = String(item?.name ?? "");
+  return name.includes("시험용") || name.startsWith("기록 조각");
+}
+
+function visibleTimeItems() {
+  return state.timedItems.filter((item) => !shouldHideTimeItem(item));
+}
+
 function populateTimeItemSelectors() {
   if (!timeItemASelect || !timeItemBSelect) {
     return;
   }
 
-  const options = state.timedItems
+  const options = visibleTimeItems()
     .map(
-      (item) =>
-        `<option value="${item.code}">${item.name} · ${item.code} · ${formatWorkDuration(item.baseDurationMs)}</option>`,
+      (item) => `<option value="${item.code}">${item.name}</option>`,
     )
     .join("");
 
@@ -2436,7 +2436,6 @@ function syncTimeCalculatorInputs() {
   timeOperationModeSelect.value = state.timeCalculatorInputs.operationMode;
   timeCauldronEnhancementInput.value = String(state.timeCalculatorInputs.cauldronEnhancement);
   timeFlameMasteryInput.value = String(state.timeCalculatorInputs.flameMastery);
-  timeFirePotionLevelInput.value = String(state.timeCalculatorInputs.firePotionLevel);
   timeItemASelect.value = state.timeCalculatorInputs.itemACode;
   timeItemBSelect.value = state.timeCalculatorInputs.itemBCode;
   timeItemAEnhancementInput.value = String(state.timeCalculatorInputs.itemAEnhancement);
@@ -2450,11 +2449,11 @@ function renderTimeDurationTable() {
   }
 
   const query = state.timeCalculatorInputs.tableFilter.trim().toLowerCase();
-  const rows = state.timedItems.filter((item) => {
+  const rows = visibleTimeItems().filter((item) => {
     if (!query) {
       return true;
     }
-    return item.name.toLowerCase().includes(query) || item.code.toLowerCase().includes(query);
+    return item.name.toLowerCase().includes(query);
   });
 
   timeDurationTableBody.innerHTML = rows
@@ -2462,8 +2461,6 @@ function renderTimeDurationTable() {
       (item) => `
         <tr>
           <td><strong>${item.name}</strong></td>
-          <td>${item.code}</td>
-          <td>${timeItemTypeLabel(item.type)}</td>
           <td>${formatWorkDuration(item.baseDurationMs)}</td>
         </tr>
       `,
@@ -2534,7 +2531,6 @@ function timeOperationLabel(mode) {
     craft: "제작",
     enhancement: "강화",
     engrave: "각인",
-    utility: "유틸",
   }[mode] ?? "작업";
 }
 
@@ -2590,14 +2586,12 @@ function formatReductionPercent(value) {
 function renderTimeItemSummary(item, enhancement, effectiveMs) {
   return `
     <strong>${item.name}</strong>
-    <p>코드: <code>${item.code}</code></p>
-    <p>종류: ${timeItemTypeLabel(item.type)}</p>
     <p>기본시간: ${formatWorkDuration(item.baseDurationMs)}</p>
     <p>강화 반영시간: ${formatWorkDuration(effectiveMs)}</p>
   `;
 }
 
-function buildTimeNotes(mode, itemA, itemB, flameReduction, fireReduction) {
+function buildTimeNotes(mode, itemA, itemB, flameReduction) {
   const notes = [
     {
       title: "작업 판정",
@@ -2625,13 +2619,6 @@ function buildTimeNotes(mode, itemA, itemB, flameReduction, fireReduction) {
     notes.push({
       title: "강화 작업 주의",
       body: "같은 아이템을 합칠 때는 두 재료 시간이 같아서 계산이 단순합니다.",
-    });
-  }
-
-  if (fireReduction > 0) {
-    notes.push({
-      title: "불꽃 포션 적용",
-      body: `강화 작업에서만 적용되며 현재 ${formatReductionPercent(fireReduction)} 추가 감소가 들어갔습니다.`,
     });
   }
 
@@ -2696,19 +2683,14 @@ function updateTimeCalculator() {
     state.timeCalculatorInputs.flameMastery,
     state.timeCalculatorInputs.cauldronEnhancement,
   );
-  const afterFlameMs = Math.round(baseWorkMs * (1 - flameReduction));
-  const fireReduction =
-    mode === "enhancement" && state.timeCalculatorInputs.firePotionLevel >= 0
-      ? Math.min(0.95, (state.timeCalculatorInputs.firePotionLevel + 1) * 0.1)
-      : 0;
-  const finalMs = Math.round(afterFlameMs * (1 - fireReduction));
+  const finalMs = Math.round(baseWorkMs * (1 - flameReduction));
 
   timeResultPrimary.innerHTML = `
     <div class="time-result-kicker">${timeOperationLabel(mode)} 예상 시간</div>
     <div class="time-result-time">${formatWorkDuration(finalMs)}</div>
     <p class="time-result-detail">
       기준시간은 두 재료 중 더 긴 시간인 <strong>${formatWorkDuration(baseWorkMs)}</strong>입니다.
-      이후 불꽃 숙련과 불꽃 포션 보정을 순서대로 적용했습니다.
+      이후 불꽃 숙련 보정을 적용했습니다.
     </p>
     ${
       recipe
@@ -2728,14 +2710,7 @@ function updateTimeCalculator() {
     },
     {
       title: "3. 불꽃 숙련 보정",
-      body: `감소율 = ${formatReductionPercent(flameReduction)}<br>적용 후 시간 = ${formatWorkDuration(afterFlameMs)}`,
-    },
-    {
-      title: "4. 불꽃 포션 보정",
-      body:
-        mode === "enhancement" && fireReduction > 0
-          ? `감소율 = ${formatReductionPercent(fireReduction)}<br>최종 시간 = <strong>${formatWorkDuration(finalMs)}</strong>`
-          : `적용 없음${mode !== "enhancement" ? " (강화 작업에서만 적용)" : ""}`,
+      body: `감소율 = ${formatReductionPercent(flameReduction)}<br>최종 시간 = <strong>${formatWorkDuration(finalMs)}</strong>`,
     },
   ]
     .map(
@@ -2748,7 +2723,7 @@ function updateTimeCalculator() {
     )
     .join("");
 
-  timeResultNotes.innerHTML = buildTimeNotes(mode, itemA, itemB, flameReduction, fireReduction)
+  timeResultNotes.innerHTML = buildTimeNotes(mode, itemA, itemB, flameReduction)
     .map(
       (note) => `
         <div class="time-note-row">
@@ -2828,6 +2803,64 @@ function skillCategoryMeta(category) {
 
 function learnedSkillCount(category) {
   return state.skills.filter((skill) => skill.category === category && getSkillLevel(skill.key) > 0).length;
+}
+
+function skillTreePointSummary() {
+  const spent = { farming: 0, brewing: 0, mana: 0, contract: 0 };
+  const max = { farming: 0, brewing: 0, mana: 0, contract: 0 };
+
+  state.skills.forEach((skill) => {
+    const treeId = skillCategoryMeta(skill.category).treeId;
+    if (!(treeId in spent)) {
+      return;
+    }
+
+    spent[treeId] += getSkillLevel(skill.key);
+    max[treeId] += Math.max(0, Number(skill.maxLevel) || 0);
+  });
+
+  return { spent, max };
+}
+
+function currentWitchTitleFromSkills() {
+  const summary = skillTreePointSummary();
+  const activeTrees = Object.keys(summary.spent)
+    .filter((treeId) => summary.spent[treeId] > 0)
+    .sort((left, right) => summary.spent[right] - summary.spent[left]);
+  const completedTrees = activeTrees.filter((treeId) => summary.max[treeId] > 0 && summary.spent[treeId] >= summary.max[treeId]);
+
+  if (completedTrees.length >= 2) {
+    const comboKey = [completedTrees[0], completedTrees[1]].sort().join("+");
+    return {
+      title: MASTER_WITCH_TITLE_COMBOS[comboKey] ?? MASTER_WITCH_TITLES[completedTrees[0]] ?? DEFAULT_WITCH_TITLE,
+      summary,
+    };
+  }
+
+  if (completedTrees.length === 1) {
+    return {
+      title: MASTER_WITCH_TITLES[completedTrees[0]] ?? DEFAULT_WITCH_TITLE,
+      summary,
+    };
+  }
+
+  const skilledTrees = activeTrees.filter((treeId) => summary.max[treeId] > 0 && summary.spent[treeId] / summary.max[treeId] >= 0.5);
+  if (skilledTrees.length >= 2) {
+    const comboKey = [skilledTrees[0], skilledTrees[1]].sort().join("+");
+    return {
+      title: SKILLED_WITCH_TITLE_COMBOS[comboKey] ?? SKILLED_WITCH_TITLES[skilledTrees[0]] ?? DEFAULT_WITCH_TITLE,
+      summary,
+    };
+  }
+
+  if (skilledTrees.length === 1) {
+    return {
+      title: SKILLED_WITCH_TITLES[skilledTrees[0]] ?? DEFAULT_WITCH_TITLE,
+      summary,
+    };
+  }
+
+  return { title: DEFAULT_WITCH_TITLE, summary };
 }
 
 function buildSkillColumns(categorySkills) {
@@ -3130,6 +3163,7 @@ function renderSkillTree() {
   const unlockedCount = state.skills.filter(skillPrerequisitesMet).length;
   const categoryLearned = learnedSkillCount(currentCategory);
   const theme = skillCategoryMeta(currentCategory);
+  const witchTitle = currentWitchTitleFromSkills();
   const selectedSkill = ensureSelectedSkill(categorySkills);
   const { positions, connections, rows, cols } = buildSkillNodeLayout(categorySkills);
 
@@ -3143,24 +3177,26 @@ function renderSkillTree() {
         </div>
       </div>
       <div class="skill-summary-stats">
+        <div class="skill-summary-title-card">
+          <span class="skill-summary-level-label">??? ???</span>
+          <strong class="skill-summary-title-value">${witchTitle.title.name}</strong>
+        </div>
         <div class="skill-summary-level-card">
-          <span class="skill-summary-level-label">필요 레벨</span>
+          <span class="skill-summary-level-label">??? ???</span>
           <strong class="skill-summary-level-value">Lv ${formatNumber(neededLevel, 0)}</strong>
-          <small>총 투자 SP ${formatNumber(totalSpent, 0)}</small>
+          <small>????? SP ${formatNumber(totalSpent, 0)}</small>
         </div>
         <div class="skill-summary-meta">
-          <p>해금 스킬: <strong>${formatNumber(unlockedCount, 0)}</strong> / ${formatNumber(state.skills.length, 0)}</p>
-          <button type="button" class="skill-reset-button" data-action="reset-skills">스킬 리셋</button>
+          <p>??? ???: <strong>${formatNumber(unlockedCount, 0)}</strong> / ${formatNumber(state.skills.length, 0)}</p>
+          <button type="button" class="skill-reset-button" data-action="reset-skills">??? ???</button>
         </div>
+      </div>
       </div>
     </div>
   `;
 
   skillTreeGrid.innerHTML = `
     <div class="skill-tree-shell icon-only" style="--tree-tint:${theme.tint}; --tree-glow:${theme.glow}; --tree-accent:${theme.accent};">
-      <div class="skill-tier-legend">
-        ${Array.from({ length: rows }, (_, index) => `<span class="skill-tier-pill">Tier ${index + 1} · ${skillLaneLabel(index)}</span>`).join("")}
-      </div>
       <div class="skill-map-shell" style="--skill-cols:${cols}; --skill-rows:${rows};">
         <svg class="skill-connector-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           ${connections
@@ -3227,6 +3263,7 @@ function updateSkillLevel(skillKey, delta) {
   }
   saveSkillTreeToStorage();
   renderSkillTree();
+  renderMaterialCalculator();
   updateTimeCalculator();
 }
 
@@ -3234,6 +3271,7 @@ function resetSkillLevels() {
   state.skillLevels = new Map();
   saveSkillTreeToStorage();
   renderSkillTree();
+  renderMaterialCalculator();
   updateTimeCalculator();
 }
 
@@ -4690,7 +4728,6 @@ skillDetailDock?.addEventListener("click", (event) => {
   [timeOperationModeSelect, "operationMode", "change"],
   [timeCauldronEnhancementInput, "cauldronEnhancement", "input"],
   [timeFlameMasteryInput, "flameMastery", "input"],
-  [timeFirePotionLevelInput, "firePotionLevel", "input"],
   [timeItemASelect, "itemACode", "change"],
   [timeItemBSelect, "itemBCode", "change"],
   [timeItemAEnhancementInput, "itemAEnhancement", "input"],
@@ -4699,8 +4736,6 @@ skillDetailDock?.addEventListener("click", (event) => {
   input?.addEventListener(eventName, () => {
     if (key === "operationMode" || key === "itemACode" || key === "itemBCode") {
       state.timeCalculatorInputs[key] = input.value;
-    } else if (key === "firePotionLevel") {
-      state.timeCalculatorInputs[key] = Math.max(-1, Number(input.value) || -1);
     } else {
       state.timeCalculatorInputs[key] = Math.max(0, Number(input.value) || 0);
     }
