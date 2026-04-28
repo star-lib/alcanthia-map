@@ -243,6 +243,47 @@ const CROP_PRODUCTION_MATERIALS = {
   "phantom-fern": "환영잎",
   "sunset-tree": "노을잎",
 };
+const PLANNER_SKILL_KEYS = {
+  rootDominion: "뿌리 지배",
+  veinReading: "맥읽기",
+  soilMastery: "토양 숙련",
+  timeMastery: "시간 숙련",
+  sturdyStem: "단단한 줄기",
+  overcrowdingResist: "과밀 저항",
+};
+const CROP_TO_PLANT_ID = {
+  herb: "herb",
+  "red-leaf": "red_flower",
+  "water-flower": "dew_root",
+  moss: "blue_moss",
+  "poison-flower": "poison_flower",
+  mushroom: "moonlight_mushroom",
+  "star-flower": "star_flower",
+  "fire-flower": "fire_vine",
+  "wind-flower": "wind_blossom",
+  "phantom-fern": "illusion_fern",
+  "sunset-tree": "sunset_bush",
+  "sun-flower": "sunlight_flower",
+};
+const PLANT_SPECS = {
+  herb: { growTimeMs: 10000, waterIntervalMs: Number.POSITIVE_INFINITY, maxHarvests: 1, produce: { intervalMs: 1 } },
+  red_flower: { growTimeMs: 10000, waterIntervalMs: 20000, maxHarvests: 500, produce: { intervalMs: 15000 } },
+  dew_root: { growTimeMs: 15000, waterIntervalMs: Number.POSITIVE_INFINITY, maxHarvests: Number.POSITIVE_INFINITY, produce: null },
+  blue_moss: { growTimeMs: 25000, waterIntervalMs: Number.POSITIVE_INFINITY, maxHarvests: 1000, produce: { intervalMs: 40000 } },
+  poison_flower: { growTimeMs: 25000, waterIntervalMs: 25000, maxHarvests: 300, produce: { intervalMs: 600000 } },
+  moonlight_mushroom: { growTimeMs: 30000, waterIntervalMs: 60000, maxHarvests: 3, produce: { intervalMs: 1 } },
+  star_flower: { growTimeMs: 30000, waterIntervalMs: 25000, maxHarvests: 100, produce: { intervalMs: 300000 } },
+  fire_vine: { growTimeMs: 30000, waterIntervalMs: Number.POSITIVE_INFINITY, maxHarvests: 100, produce: { intervalMs: 600000 }, waterKills: true },
+  wind_blossom: { growTimeMs: 35000, waterIntervalMs: 30000, maxHarvests: Number.POSITIVE_INFINITY, produce: { intervalMs: 1800000 } },
+  sunlight_flower: { growTimeMs: 35000, waterIntervalMs: 25000, maxHarvests: Number.POSITIVE_INFINITY, produce: null },
+  illusion_fern: { growTimeMs: 25000, waterIntervalMs: 30000, maxHarvests: 500, produce: { intervalMs: 480000 } },
+  sunset_bush: { growTimeMs: 25000, waterIntervalMs: 25000, maxHarvests: 200, produce: { intervalMs: 10000 } },
+};
+const PLANNER_SIMULATION = {
+  startMs: 1000,
+  durationMs: 2 * 60 * 60 * 1000,
+  stepMs: 1000,
+};
 const STATIC_TIMED_ITEMS = [
   { code: "herb_seed", name: "약초 씨앗", type: "seed", baseDurationMs: 15000 },
   { code: "dewroot_bulb", name: "이슬뿌리 구근", type: "seed", baseDurationMs: 15000 },
@@ -735,6 +776,7 @@ let copyFeedbackTimeout = null;
 let resizeObserver = null;
 let lastDevicePixelRatio = window.devicePixelRatio || 1;
 let lastCompactViewport = window.matchMedia("(max-width: 720px)").matches;
+let plannerAnalysisCache = { key: "", value: null };
 
 function createStartingCells() {
   const cells = new Set();
@@ -2162,7 +2204,7 @@ function renderMaterialUsageSummary() {
   const usage = collectHourlyMaterialUsage();
   const { cropYieldTotals } = calculateCropProduction();
   const fieldProduction = new Map();
-  CROPS.filter((crop) => crop.hourlyYield > 0).forEach((crop) => {
+  CROPS.filter((crop) => (cropYieldTotals.get(crop.id) ?? 0) > 0).forEach((crop) => {
     const producedMaterial = CROP_PRODUCTION_MATERIALS[crop.id] ?? crop.name;
     fieldProduction.set(producedMaterial, (fieldProduction.get(producedMaterial) ?? 0) + (cropYieldTotals.get(crop.id) ?? 0));
   });
@@ -3300,6 +3342,7 @@ function updateSkillLevel(skillKey, delta) {
   renderRecipeCalculator();
   renderMaterialCalculator();
   updateTimeCalculator();
+  draw();
 }
 
 function resetSkillLevels() {
@@ -3309,6 +3352,7 @@ function resetSkillLevels() {
   renderRecipeCalculator();
   renderMaterialCalculator();
   updateTimeCalculator();
+  draw();
 }
 
 function syncSkillPointInputsFromState() {
@@ -3451,6 +3495,7 @@ async function loadSkills() {
     }
     renderSkillTree();
     renderRecipeCalculator();
+    draw();
   } catch (error) {
     if (skillTreeSummary) {
       skillTreeSummary.innerHTML = `<p>skills.csv를 불러오지 못했습니다.</p>`;
@@ -3489,8 +3534,8 @@ function borderLayer(col, row) {
   return Math.max(colGap, rowGap);
 }
 
-function expansionCostText(layer) {
-  return `${layer}강 마력결정 1개 + ${layer}강 각인석 1개`;
+function expansionCostText(enhancement) {
+  return `${enhancement}강 마력결정 1개 + ${enhancement}강 각인석 1개`;
 }
 
 function getDiagonalNeighbors(col, row) {
@@ -3611,62 +3656,448 @@ function drawGridBackdrop() {
   ctx.restore();
 }
 
-function buildEffectMap() {
-  const effects = new Map();
+function plannerSkillLevel(skillName) {
+  return getSkillLevel(normalizeSkillName(skillName));
+}
+
+function plannerSkillLevels() {
+  return {
+    rootDominion: plannerSkillLevel(PLANNER_SKILL_KEYS.rootDominion),
+    veinReading: plannerSkillLevel(PLANNER_SKILL_KEYS.veinReading),
+    soilMastery: plannerSkillLevel(PLANNER_SKILL_KEYS.soilMastery),
+    timeMastery: plannerSkillLevel(PLANNER_SKILL_KEYS.timeMastery),
+    sturdyStem: plannerSkillLevel(PLANNER_SKILL_KEYS.sturdyStem),
+    overcrowdingResist: plannerSkillLevel(PLANNER_SKILL_KEYS.overcrowdingResist),
+  };
+}
+
+function plannerSimulationCacheKey() {
+  return JSON.stringify({
+    cells: [...state.cells].sort(),
+    plants: [...state.plants.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+    desertTiles: [...state.desertTiles].sort(),
+    boostPotionActive: state.boostPotionActive,
+    skillLevels: plannerSkillLevels(),
+  });
+}
+
+function plannerFieldEnhancement(col, row) {
+  const point = logicalPoint(col, row);
+  const center = logicalPoint(CENTER_CELL.col, CENTER_CELL.row);
+  const distance = Math.abs(point.x - center.x) + Math.abs(point.y - center.y);
+  return Math.max(0, distance - 3);
+}
+
+function plannerCompoundedValue(base, level, count) {
+  return level > 0 ? compoundedEffect(base, level, count) : 0;
+}
+
+function plannerGrowthTime(plantId, cellConditions, soilMastery, enhancement) {
+  const spec = PLANT_SPECS[plantId];
+  if (!spec) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const growthMultiplier = 1 - plannerCompoundedValue(0.05, soilMastery, enhancement + 1);
+  const toxicMultiplier = cellConditions.includes("toxic") && plantId === "poison_flower" ? 0.5 : 1;
+  const fertileMultiplier = cellConditions.includes("fertile") ? 0.5 : 1;
+  return spec.growTimeMs * growthMultiplier * toxicMultiplier * fertileMultiplier;
+}
+
+function plannerProductionInterval(baseIntervalMs, timeMastery, enhancement) {
+  if (!Number.isFinite(baseIntervalMs) || baseIntervalMs <= 0) {
+    return baseIntervalMs;
+  }
+  return baseIntervalMs * (1 - plannerCompoundedValue(0.01, timeMastery, enhancement + 1));
+}
+
+function plannerMaxHarvests(maxHarvests, enhancement, sturdyStem) {
+  if (!Number.isFinite(maxHarvests)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  if (enhancement <= 0 || sturdyStem <= 0) {
+    return maxHarvests;
+  }
+  return maxHarvests * (enhancement + 1);
+}
+
+function plannerOvercrowdingMultiplier(sameNeighborCount, overcrowdingResist) {
+  if (!sameNeighborCount) {
+    return 1;
+  }
+  return 1 - (1 - (0.5 ** sameNeighborCount)) * Math.max(0, 1 - overcrowdingResist * 0.25);
+}
+
+function plannerProductionMultiplier(
+  plantId,
+  redEssenceActive,
+  cellConditions,
+  sameNeighborCount,
+  uniqueNeighborCount,
+  overcrowdingResist,
+) {
+  let multiplier = redEssenceActive ? 1.5 : 1;
+
+  if (plantId === "blue_moss" && cellConditions.includes("humid")) {
+    multiplier *= 2;
+  }
+  if (plantId === "poison_flower" && cellConditions.includes("toxic")) {
+    multiplier *= 2;
+  }
+  if (plantId === "illusion_fern" && Number.isFinite(uniqueNeighborCount)) {
+    multiplier *= Math.max(0, uniqueNeighborCount);
+  }
+  if (cellConditions.includes("sunlit")) {
+    multiplier *= 1.3;
+  }
+
+  multiplier *= plannerOvercrowdingMultiplier(sameNeighborCount, overcrowdingResist);
+  return multiplier;
+}
+
+function buildPlannerAnalysis() {
+  const skillLevels = plannerSkillLevels();
+  const cells = new Map();
+  const cropCounts = new Map(CROPS.map((crop) => [crop.id, 0]));
 
   for (const key of state.cells) {
-    effects.set(key, {
-      watered: 0,
-      poisoned: 0,
-      sunBuff: 0,
-      dead: false,
+    const { col, row } = parseKey(key);
+    const point = logicalPoint(col, row);
+    cells.set(key, {
+      key,
+      col,
+      row,
+      logicalX: point.x,
+      logicalY: point.y,
+      conditions: state.desertTiles.has(key) ? ["arid"] : [],
+      plant: null,
     });
   }
 
-  for (const [key, cropId] of state.plants) {
-    const crop = cropById.get(cropId);
-    if (!crop) continue;
+  for (const [key, cropId] of state.plants.entries()) {
+    const cell = cells.get(key);
+    const plantId = CROP_TO_PLANT_ID[cropId];
+    const spec = PLANT_SPECS[plantId];
+    if (!cell || !spec) {
+      continue;
+    }
 
-    const origin = parseKey(key);
+    cropCounts.set(cropId, (cropCounts.get(cropId) ?? 0) + 1);
 
-    if (crop.id === "water-flower") {
-      for (const cell of state.cells) {
-        const target = parseKey(cell);
-        if (
-          chebyshevDistance(origin, target) <= 2 &&
-          !state.desertTiles.has(cell)
+    const startMs = PLANNER_SIMULATION.startMs;
+    const manuallyWatered = !spec.waterKills && !cell.conditions.includes("arid");
+    cell.plant = {
+      cropId,
+      id: plantId,
+      enhancement: 0,
+      health: 100,
+      growStartedAt: manuallyWatered || spec.waterKills ? startMs : null,
+      wateredAt: manuallyWatered ? startMs : null,
+      produceAccum: 0,
+      totalProduced: 0,
+      lastUpdate: startMs,
+      conditions: plantId === "poison_flower" ? ["poison_immune"] : [],
+    };
+  }
+
+  const orthogonalNeighborKeys = (cell) =>
+    getDiagonalNeighbors(cell.col, cell.row)
+      .map(({ col, row }) => cellKey(col, row))
+      .filter((key) => cells.has(key));
+
+  const rangeKeys = (cell, range) => {
+    if (range >= 1) {
+      return [...cells.values()]
+        .filter((other) =>
+          other.key !== cell.key
+          && Math.max(
+            Math.abs(other.logicalX - cell.logicalX),
+            Math.abs(other.logicalY - cell.logicalY),
+          ) <= range,
+        )
+        .map((other) => other.key);
+    }
+    return orthogonalNeighborKeys(cell);
+  };
+
+  const isMature = (cell, timeMs) =>
+    Boolean(
+      cell?.plant
+      && cell.plant.health > 0
+      && cell.plant.growStartedAt != null
+      && timeMs >= cell.plant.growStartedAt + plannerGrowthTime(
+        cell.plant.id,
+        cell.conditions,
+        skillLevels.soilMastery,
+        cell.plant.enhancement,
+      ),
+    );
+
+  for (
+    let currentMs = PLANNER_SIMULATION.startMs + PLANNER_SIMULATION.stepMs;
+    currentMs <= PLANNER_SIMULATION.startMs + PLANNER_SIMULATION.durationMs;
+    currentMs += PLANNER_SIMULATION.stepMs
+  ) {
+    for (const cell of cells.values()) {
+      cell.conditions = cell.conditions.filter((condition) =>
+        condition !== "humid" && condition !== "poisonous" && condition !== "sunlit");
+    }
+
+    for (const cell of cells.values()) {
+      if (!isMature(cell, currentMs)) {
+        continue;
+      }
+
+      const plant = cell.plant;
+      if (plant.id === "dew_root") {
+        const veinBonus = skillLevels.veinReading > 0 ? plant.enhancement : 0;
+        const range = skillLevels.rootDominion + plant.enhancement + veinBonus;
+        for (const targetKey of rangeKeys(cell, range)) {
+          const target = cells.get(targetKey);
+          if (!target || target.conditions.includes("arid")) {
+            continue;
+          }
+          if (!target.conditions.includes("humid")) {
+            target.conditions.push("humid");
+          }
+          if (target.plant && target.plant.health > 0) {
+            target.plant.wateredAt = currentMs;
+            target.plant.growStartedAt ??= currentMs;
+          }
+        }
+      } else if (plant.id === "sunlight_flower") {
+        if (!cell.conditions.includes("sunlit")) {
+          cell.conditions.push("sunlit");
+        }
+        const veinBonus = skillLevels.veinReading > 0 ? plant.enhancement : 0;
+        const range = plant.enhancement + veinBonus;
+        for (const targetKey of (range > 0 ? rangeKeys(cell, range) : orthogonalNeighborKeys(cell))) {
+          const target = cells.get(targetKey);
+          if (target && !target.conditions.includes("sunlit")) {
+            target.conditions.push("sunlit");
+          }
+        }
+      }
+    }
+
+    for (const cell of cells.values()) {
+      const plant = cell.plant;
+      if (!plant || plant.health <= 0) {
+        continue;
+      }
+
+      const spec = PLANT_SPECS[plant.id];
+      const deltaMs = currentMs - plant.lastUpdate;
+      if (spec.waterKills && plant.wateredAt != null) {
+        plant.health = 0;
+        plant.lastUpdate = currentMs;
+        continue;
+      }
+      if (!spec.waterKills && plant.wateredAt == null) {
+        plant.lastUpdate = currentMs;
+        continue;
+      }
+
+      if (!spec.waterKills && Number.isFinite(spec.waterIntervalMs) && plant.wateredAt != null) {
+        const dryAt = plant.wateredAt + spec.waterIntervalMs * 2;
+        if (currentMs > dryAt) {
+          const decayFrom = Math.max(plant.lastUpdate, dryAt);
+          const decayMs = Math.max(0, currentMs - decayFrom);
+          if (decayMs > 0) {
+            const healthPerMinute = 60000 / spec.waterIntervalMs;
+            plant.health = Math.max(0, plant.health - (decayMs / 60000) * healthPerMinute);
+          }
+        }
+      }
+
+      if (plant.conditions.includes("poisoned")) {
+        plant.health = Math.max(0, plant.health - (deltaMs / 60000));
+      }
+      if (plant.health <= 0) {
+        plant.lastUpdate = currentMs;
+        continue;
+      }
+
+      const produce = spec.produce;
+      if (!produce || plant.growStartedAt == null) {
+        plant.lastUpdate = currentMs;
+        continue;
+      }
+
+      const maxHarvests = plannerMaxHarvests(
+        spec.maxHarvests,
+        plant.enhancement,
+        skillLevels.sturdyStem,
+      );
+      const remainingCapacity = Number.isFinite(maxHarvests)
+        ? Math.max(0, maxHarvests - plant.totalProduced)
+        : Number.POSITIVE_INFINITY;
+      const readyAt = plant.growStartedAt
+        + plannerGrowthTime(plant.id, cell.conditions, skillLevels.soilMastery, plant.enhancement);
+
+      if (remainingCapacity > 0 && currentMs >= readyAt && !plant.conditions.includes("poisoned")) {
+        const sameNeighborCount = orthogonalNeighborKeys(cell)
+          .map((key) => cells.get(key)?.plant)
+          .filter((neighbor) => neighbor && neighbor.health > 0 && neighbor.id === plant.id)
+          .length;
+        const diverseNeighborCount = plant.id === "illusion_fern"
+          ? new Set(
+            orthogonalNeighborKeys(cell)
+              .map((key) => cells.get(key)?.plant)
+              .filter((neighbor) => neighbor && neighbor.health > 0)
+              .map((neighbor) => neighbor.id),
+          ).size
+          : undefined;
+        const multiplier = plannerProductionMultiplier(
+          plant.id,
+          state.boostPotionActive,
+          cell.conditions,
+          sameNeighborCount,
+          diverseNeighborCount,
+          skillLevels.overcrowdingResist,
+        );
+        const adjustedInterval = plannerProductionInterval(
+          produce.intervalMs,
+          skillLevels.timeMastery,
+          plant.enhancement,
+        );
+        const activeMs = Math.max(0, currentMs - Math.max(plant.lastUpdate, readyAt));
+        plant.produceAccum += activeMs * multiplier;
+
+        while (
+          adjustedInterval > 0
+          && plant.produceAccum >= adjustedInterval
+          && plant.totalProduced < maxHarvests
         ) {
-          effects.get(cell).watered += 1;
+          plant.produceAccum -= adjustedInterval;
+          plant.totalProduced += 1;
+        }
+      }
+
+      plant.lastUpdate = currentMs;
+    }
+
+    for (const cell of cells.values()) {
+      if (!isMature(cell, currentMs) || cell.plant.id !== "poison_flower") {
+        continue;
+      }
+
+      const veinBonus = skillLevels.veinReading > 0 ? cell.plant.enhancement : 0;
+      const range = cell.plant.enhancement + veinBonus;
+      for (const targetKey of rangeKeys(cell, range)) {
+        const target = cells.get(targetKey);
+        if (target && !target.conditions.includes("poisonous")) {
+          target.conditions.push("poisonous");
         }
       }
     }
 
-    if (crop.id === "poison-flower") {
-      for (const neighbor of getDiagonalNeighbors(origin.col, origin.row)) {
-        const neighborKey = cellKey(neighbor.col, neighbor.row);
-        if (state.cells.has(neighborKey)) {
-          effects.get(neighborKey).poisoned += 1;
-        }
+    for (const cell of cells.values()) {
+      if (!cell.conditions.includes("poisonous") || !cell.plant || cell.plant.health <= 0) {
+        continue;
       }
-    }
-
-    if (crop.id === "sun-flower") {
-      for (const neighbor of getDiagonalNeighbors(origin.col, origin.row)) {
-        const neighborKey = cellKey(neighbor.col, neighbor.row);
-        if (state.cells.has(neighborKey)) {
-          effects.get(neighborKey).sunBuff += 1;
-        }
+      if (
+        !cell.plant.conditions.includes("poisoned")
+        && !cell.plant.conditions.includes("poison_immune")
+      ) {
+        cell.plant.conditions.push("poisoned");
       }
     }
   }
 
-  for (const [key, cropId] of state.plants) {
-    if (cropId === "fire-flower" && effects.get(key)?.watered > 0) {
-      effects.get(key).dead = true;
+  const snapshotTime = PLANNER_SIMULATION.startMs + PLANNER_SIMULATION.durationMs;
+  const cropYieldTotals = new Map(CROPS.map((crop) => [crop.id, 0]));
+
+  for (const cell of cells.values()) {
+    const plant = cell.plant;
+    if (!plant || plant.health <= 0 || plant.growStartedAt == null || plant.conditions.includes("poisoned")) {
+      continue;
     }
+
+    const spec = PLANT_SPECS[plant.id];
+    const produce = spec?.produce;
+    if (!produce || produce.intervalMs <= 1) {
+      continue;
+    }
+
+    const readyAt = plant.growStartedAt
+      + plannerGrowthTime(plant.id, cell.conditions, skillLevels.soilMastery, plant.enhancement);
+    if (snapshotTime < readyAt) {
+      continue;
+    }
+
+    const maxHarvests = plannerMaxHarvests(
+      spec.maxHarvests,
+      plant.enhancement,
+      skillLevels.sturdyStem,
+    );
+    const remainingCapacity = Number.isFinite(maxHarvests)
+      ? Math.max(0, maxHarvests - plant.totalProduced)
+      : Number.POSITIVE_INFINITY;
+    if (remainingCapacity <= 0) {
+      continue;
+    }
+
+    const sameNeighborCount = orthogonalNeighborKeys(cell)
+      .map((key) => cells.get(key)?.plant)
+      .filter((neighbor) => neighbor && neighbor.health > 0 && neighbor.id === plant.id)
+      .length;
+    const diverseNeighborCount = plant.id === "illusion_fern"
+      ? new Set(
+        orthogonalNeighborKeys(cell)
+          .map((key) => cells.get(key)?.plant)
+          .filter((neighbor) => neighbor && neighbor.health > 0)
+          .map((neighbor) => neighbor.id),
+      ).size
+      : undefined;
+    const multiplier = plannerProductionMultiplier(
+      plant.id,
+      state.boostPotionActive,
+      cell.conditions,
+      sameNeighborCount,
+      diverseNeighborCount,
+      skillLevels.overcrowdingResist,
+    );
+    const adjustedInterval = plannerProductionInterval(
+      produce.intervalMs,
+      skillLevels.timeMastery,
+      plant.enhancement,
+    );
+    const perHour = (3600000 / adjustedInterval) * multiplier;
+    cropYieldTotals.set(plant.cropId, (cropYieldTotals.get(plant.cropId) ?? 0) + perHour);
   }
 
-  return effects;
+  const effects = new Map();
+
+  for (const cell of cells.values()) {
+    effects.set(cell.key, {
+      watered: cell.conditions.includes("humid") ? 1 : 0,
+      poisoned: cell.conditions.includes("poisonous") || cell.plant?.conditions.includes("poisoned") ? 1 : 0,
+      sunBuff: cell.conditions.includes("sunlit") ? 1 : 0,
+      dead: Boolean(cell.plant && cell.plant.health <= 0),
+    });
+  }
+
+  return {
+    cropCounts,
+    cropYieldTotals,
+    totalYield: [...cropYieldTotals.values()].reduce((sum, value) => sum + value, 0),
+    effects,
+  };
+}
+
+function getPlannerAnalysis() {
+  const key = plannerSimulationCacheKey();
+  if (plannerAnalysisCache.key === key && plannerAnalysisCache.value) {
+    return plannerAnalysisCache.value;
+  }
+
+  const value = buildPlannerAnalysis();
+  plannerAnalysisCache = { key, value };
+  return value;
+}
+
+function buildEffectMap() {
+  return getPlannerAnalysis().effects;
 }
 
 function drawEffectOverlay(points, effect) {
@@ -4081,6 +4512,10 @@ function renderPaletteGroup(target, items) {
   target.innerHTML = "";
 
   items.forEach((crop) => {
+    const spec = CROP_TO_PLANT_ID[crop.id] ? PLANT_SPECS[CROP_TO_PLANT_ID[crop.id]] : null;
+    const displayYield = spec?.produce?.intervalMs
+      ? 3600000 / spec.produce.intervalMs
+      : crop.hourlyYield;
     const button = document.createElement("button");
     button.type = "button";
     button.className = `crop-button${crop.id === state.selectedCropId ? " active" : ""}`;
@@ -4097,7 +4532,7 @@ function renderPaletteGroup(target, items) {
         </span>
         <span class="crop-button-label">
           <strong>${crop.name}</strong>
-          <span class="crop-yield">시간당 ${crop.hourlyYield.toLocaleString("ko-KR")}개</span>
+          <span class="crop-yield">시간당 ${displayYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개</span>
         </span>
       </span>
     `;
@@ -4118,16 +4553,16 @@ function renderPalette() {
 
 function renderProductionStats() {
   const { cropCounts, cropYieldTotals, totalYield } = calculateCropProduction();
-  const displayedTotalYield = state.boostPotionActive ? totalYield * 1.5 : totalYield;
 
-  productionSummary.textContent = `시간당 총 생산량 ${displayedTotalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
+  productionSummary.textContent = `시간당 총 생산량 ${totalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
   if (state.boostPotionActive) {
-    productionSummary.textContent += " (촉진포션 On)";
+    productionSummary.textContent += " (붉은 정수 On)";
   }
 
   productionGrid.innerHTML = "";
 
-  CROPS.filter((crop) => crop.hourlyYield > 0).forEach((crop) => {
+  CROPS.filter((crop) =>
+    (cropCounts.get(crop.id) ?? 0) > 0 || (cropYieldTotals.get(crop.id) ?? 0) > 0).forEach((crop) => {
     const count = cropCounts.get(crop.id) ?? 0;
     const yieldTotal = cropYieldTotals.get(crop.id) ?? 0;
     const card = document.createElement("article");
@@ -4142,64 +4577,7 @@ function renderProductionStats() {
 }
 
 function calculateCropProduction() {
-  const cropCounts = new Map(CROPS.map((crop) => [crop.id, 0]));
-  const effects = buildEffectMap();
-  const cropYieldTotals = new Map(CROPS.map((crop) => [crop.id, 0]));
-
-  for (const [key, cropId] of state.plants.entries()) {
-    if (cropCounts.has(cropId)) {
-      cropCounts.set(cropId, cropCounts.get(cropId) + 1);
-    }
-
-    const crop = cropById.get(cropId);
-    if (!crop || crop.hourlyYield <= 0) {
-      continue;
-    }
-
-    const buffMultiplier = getProductionMultiplier(key, cropId, effects);
-    cropYieldTotals.set(
-      cropId,
-      cropYieldTotals.get(cropId) + crop.hourlyYield * buffMultiplier,
-    );
-  }
-
-  const totalYield = [...cropYieldTotals.values()].reduce((sum, value) => sum + value, 0);
-
-  return { cropCounts, cropYieldTotals, totalYield };
-}
-
-function getNeighborPlantIds(key) {
-  const { col, row } = parseKey(key);
-  return getDiagonalNeighbors(col, row)
-    .map(({ col: neighborCol, row: neighborRow }) => state.plants.get(cellKey(neighborCol, neighborRow)))
-    .filter(Boolean);
-}
-
-function getOvercrowdingMultiplier(sameNeighborCount) {
-  const factors = [1, 0.5, 0.25, 0.16, 0.06];
-  return factors[Math.min(sameNeighborCount, 4)];
-}
-
-function getProductionMultiplier(key, cropId, effects) {
-  const effect = effects.get(key);
-  const neighborPlantIds = getNeighborPlantIds(key);
-  const sameNeighborCount = neighborPlantIds.filter((id) => id === cropId).length;
-  let multiplier = getOvercrowdingMultiplier(sameNeighborCount);
-
-  if (effect && effect.sunBuff > 0) {
-    multiplier *= 1.3;
-  }
-
-  if (cropId === "moss" && effect && effect.watered > 0) {
-    multiplier *= 2;
-  }
-
-  if (cropId === "phantom-fern") {
-    const uniqueNeighborPlantCount = new Set(neighborPlantIds).size;
-    multiplier *= Math.max(1, Math.min(uniqueNeighborPlantCount, 4));
-  }
-
-  return multiplier;
+  return getPlannerAnalysis();
 }
 
 function showCopyFeedback(message, isError = false) {
@@ -4292,10 +4670,10 @@ function updateSlotTooltip() {
   }
 
   const { col, row } = parseKey(state.hover.key);
-  const layer = borderLayer(col, row);
+  const layer = plannerFieldEnhancement(col, row);
   slotTooltip.innerHTML = `
     <strong>확장 비용</strong>
-    테두리 ${layer}단계 확장<br />
+    강화 단계 ${layer}<br />
     ${expansionCostText(layer)}
   `;
   slotTooltip.hidden = false;
