@@ -790,6 +790,10 @@ let resizeObserver = null;
 let lastDevicePixelRatio = window.devicePixelRatio || 1;
 let lastCompactViewport = window.matchMedia("(max-width: 720px)").matches;
 let plannerAnalysisCache = { key: "", value: null };
+let plannerPreviewCache = { key: "", value: null };
+let plannerAnalysisPendingKey = "";
+let plannerAnalysisJobHandle = null;
+let plannerAnalysisJobType = "";
 
 function createStartingCells() {
   const cells = new Set();
@@ -3407,22 +3411,32 @@ function updateSkillLevel(skillKey, delta) {
   }
   saveSkillTreeToStorage();
   renderSkillTree();
-  renderPalette();
-  renderRecipeCalculator();
-  renderMaterialCalculator();
-  updateTimeCalculator();
-  draw();
+  if (state.activeTab === "planner") {
+    renderPlannerEnhancementControl();
+    draw();
+  } else if (state.activeTab === "calculator") {
+    renderRecipeCalculator();
+  } else if (state.activeTab === "materials") {
+    renderMaterialCalculator();
+  } else if (state.activeTab === "time") {
+    updateTimeCalculator();
+  }
 }
 
 function resetSkillLevels() {
   state.skillLevels = new Map();
   saveSkillTreeToStorage();
   renderSkillTree();
-  renderPalette();
-  renderRecipeCalculator();
-  renderMaterialCalculator();
-  updateTimeCalculator();
-  draw();
+  if (state.activeTab === "planner") {
+    renderPlannerEnhancementControl();
+    draw();
+  } else if (state.activeTab === "calculator") {
+    renderRecipeCalculator();
+  } else if (state.activeTab === "materials") {
+    renderMaterialCalculator();
+  } else if (state.activeTab === "time") {
+    updateTimeCalculator();
+  }
 }
 
 function syncSkillPointInputsFromState() {
@@ -4280,13 +4294,243 @@ function getPlannerAnalysis() {
     return plannerAnalysisCache.value;
   }
 
+  cancelPlannerAnalysisJob();
+  plannerAnalysisPendingKey = "";
   const value = buildPlannerAnalysis();
   plannerAnalysisCache = { key, value };
   return value;
 }
 
 function buildEffectMap() {
-  return getPlannerAnalysis().effects;
+  const key = plannerSimulationCacheKey();
+  if (plannerPreviewCache.key === key && plannerPreviewCache.value) {
+    return plannerPreviewCache.value;
+  }
+
+  const skillLevels = plannerSkillLevels();
+  const cells = new Map();
+  const cardinalDeltas = [
+    { col: -1, row: -1 },
+    { col: 1, row: -1 },
+    { col: -1, row: 1 },
+    { col: 1, row: 1 },
+  ];
+
+  for (const keyName of state.cells) {
+    const { col, row } = parseKey(keyName);
+    const point = logicalPoint(col, row);
+    cells.set(keyName, {
+      key: keyName,
+      col,
+      row,
+      logicalX: point.x,
+      logicalY: point.y,
+      conditions: state.desertTiles.has(keyName) ? ["arid"] : [],
+      plant: null,
+    });
+  }
+
+  for (const [keyName, storedPlacement] of state.plants.entries()) {
+    const cell = cells.get(keyName);
+    const placement = normalizePlantPlacement(storedPlacement);
+    const cropId = placement?.cropId;
+    const plantId = CROP_TO_PLANT_ID[cropId];
+    if (!cell || !plantId || !placement) {
+      continue;
+    }
+
+    cell.plant = {
+      cropId,
+      id: plantId,
+      enhancement: placement.enhancement,
+    };
+  }
+
+  const orthogonalNeighborKeys = (cell) =>
+    getDiagonalNeighbors(cell.col, cell.row)
+      .map(({ col, row }) => cellKey(col, row))
+      .filter((neighborKey) => cells.has(neighborKey));
+
+  const rangeKeys = (cell, range) => {
+    if (range >= 1) {
+      return [...cells.values()]
+        .filter((other) =>
+          other.key !== cell.key
+          && Math.max(
+            Math.abs(other.logicalX - cell.logicalX),
+            Math.abs(other.logicalY - cell.logicalY),
+          ) <= range,
+        )
+        .map((other) => other.key);
+    }
+    return orthogonalNeighborKeys(cell);
+  };
+
+  const effects = new Map();
+  for (const cell of cells.values()) {
+    effects.set(cell.key, {
+      watered: 0,
+      poisoned: 0,
+      sunBuff: 0,
+      dead: false,
+      windAnchor: 0,
+      windSource: 0,
+      windTarget: 0,
+      windPreviewCropIds: [],
+      windSpawned: false,
+    });
+  }
+
+  for (const cell of cells.values()) {
+    const plant = cell.plant;
+    if (!plant) {
+      continue;
+    }
+
+    if (plant.id === "dew_root") {
+      const range = skillLevels.rootDominion + (skillLevels.veinReading > 0 ? plant.enhancement : 0);
+      for (const targetKey of rangeKeys(cell, range)) {
+        const target = cells.get(targetKey);
+        if (!target || target.conditions.includes("arid")) {
+          continue;
+        }
+        effects.get(targetKey).watered = 1;
+      }
+    }
+
+    if (plant.id === "sunlight_flower") {
+      effects.get(cell.key).sunBuff = 1;
+      const range = skillLevels.veinReading > 0 ? plant.enhancement : 0;
+      const targetKeys = range > 0 ? rangeKeys(cell, range) : orthogonalNeighborKeys(cell);
+      for (const targetKey of targetKeys) {
+        effects.get(targetKey).sunBuff = 1;
+      }
+    }
+
+    if (plant.id === "poison_flower") {
+      const range = skillLevels.veinReading > 0 ? plant.enhancement : 0;
+      for (const targetKey of rangeKeys(cell, range)) {
+        effects.get(targetKey).poisoned = 1;
+      }
+    }
+  }
+
+  for (const cell of cells.values()) {
+    const plant = cell.plant;
+    const spec = plant ? PLANT_SPECS[plant.id] : null;
+    if (!plant || !spec?.waterKills) {
+      continue;
+    }
+
+    if (effects.get(cell.key).watered > 0) {
+      effects.get(cell.key).dead = true;
+    }
+  }
+
+  for (const cell of cells.values()) {
+    const plant = cell.plant;
+    if (!plant || plant.id !== "wind_blossom") {
+      continue;
+    }
+
+    for (const delta of cardinalDeltas) {
+      const sourceKey = cellKey(cell.col + delta.col, cell.row + delta.row);
+      const targetKey = cellKey(cell.col + delta.col * 2, cell.row + delta.row * 2);
+      const sourceCell = cells.get(sourceKey);
+      const targetCell = cells.get(targetKey);
+      const sourcePlant = sourceCell?.plant;
+      if (!sourcePlant || sourcePlant.id === "wind_blossom" || !targetCell || targetCell.plant) {
+        continue;
+      }
+
+      effects.get(cell.key).windAnchor += 1;
+      effects.get(sourceKey).windSource += 1;
+      effects.get(targetKey).windTarget += 1;
+      if (!effects.get(targetKey).windPreviewCropIds.includes(sourcePlant.cropId)) {
+        effects.get(targetKey).windPreviewCropIds.push(sourcePlant.cropId);
+      }
+    }
+  }
+
+  plannerPreviewCache = { key, value: effects };
+  return effects;
+}
+
+function renderProductionStatsFromAnalysis(analysis) {
+  const { cropCounts, cropYieldTotals, totalYield } = analysis;
+
+  productionSummary.textContent = `시간당 총 생산량 ${totalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
+  if (state.boostPotionActive) {
+    productionSummary.textContent += " (붉은 정수 On)";
+  }
+
+  productionGrid.innerHTML = "";
+
+  CROPS.filter((crop) =>
+    (cropCounts.get(crop.id) ?? 0) > 0 || (cropYieldTotals.get(crop.id) ?? 0) > 0).forEach((crop) => {
+    const count = cropCounts.get(crop.id) ?? 0;
+    const yieldTotal = cropYieldTotals.get(crop.id) ?? 0;
+    const card = document.createElement("article");
+    card.className = "production-card";
+    card.innerHTML = `
+      <strong>${crop.name}</strong>
+      <p>심은 개수: ${count}개</p>
+      <p>시간당 생산량: ${yieldTotal.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개</p>
+    `;
+    productionGrid.appendChild(card);
+  });
+}
+
+function cancelPlannerAnalysisJob() {
+  if (!plannerAnalysisJobHandle) {
+    return;
+  }
+
+  if (plannerAnalysisJobType === "idle" && typeof window.cancelIdleCallback === "function") {
+    window.cancelIdleCallback(plannerAnalysisJobHandle);
+  } else {
+    clearTimeout(plannerAnalysisJobHandle);
+  }
+
+  plannerAnalysisJobHandle = null;
+  plannerAnalysisJobType = "";
+}
+
+function schedulePlannerAnalysisRender() {
+  const key = plannerSimulationCacheKey();
+  if (plannerAnalysisCache.key === key && plannerAnalysisCache.value) {
+    renderProductionStatsFromAnalysis(plannerAnalysisCache.value);
+    return;
+  }
+
+  if (plannerAnalysisPendingKey === key) {
+    return;
+  }
+
+  cancelPlannerAnalysisJob();
+  plannerAnalysisPendingKey = key;
+  productionSummary.textContent = "집계 계산 중...";
+  productionGrid.innerHTML = "";
+
+  const run = () => {
+    plannerAnalysisJobHandle = null;
+    plannerAnalysisJobType = "";
+    const value = buildPlannerAnalysis();
+    plannerAnalysisCache = { key, value };
+    if (plannerAnalysisPendingKey !== key) {
+      return;
+    }
+    plannerAnalysisPendingKey = "";
+    renderProductionStatsFromAnalysis(value);
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    plannerAnalysisJobType = "idle";
+    plannerAnalysisJobHandle = window.requestIdleCallback(run, { timeout: 250 });
+  } else {
+    plannerAnalysisJobType = "timeout";
+    plannerAnalysisJobHandle = window.setTimeout(run, 0);
+  }
 }
 
 function drawEffectOverlay(points, effect) {
@@ -4371,6 +4615,7 @@ function drawWindPreview(col, row, effect) {
   }
 
   const center = gridToPixel(col, row);
+  const points = polygonForCell(col, row);
   const previewIds = effect.windPreviewCropIds
     .map((cropId) => cropById.get(cropId))
     .filter(Boolean)
@@ -4385,6 +4630,11 @@ function drawWindPreview(col, row, effect) {
     const hasCropImage = cropImage?.complete && cropImage.naturalWidth > 0;
 
     ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+    ctx.closePath();
+    ctx.clip();
     ctx.globalAlpha = alpha;
     if (hasCropImage) {
       ctx.drawImage(cropImage, x - size / 2, y - size / 2, size, size);
@@ -4406,20 +4656,20 @@ function drawWindPreview(col, row, effect) {
   };
 
   if (previewIds.length === 1) {
-    drawPreviewToken(previewIds[0], center.x, center.y, CELL_SIZE * 0.92, 0.42);
+    drawPreviewToken(previewIds[0], center.x, center.y, CELL_SIZE * 0.74, 0.4);
     return;
   }
 
   const offsets = [
-    { x: -13, y: -12 },
-    { x: 13, y: -12 },
-    { x: -13, y: 12 },
-    { x: 13, y: 12 },
+    { x: -10, y: -10 },
+    { x: 10, y: -10 },
+    { x: -10, y: 10 },
+    { x: 10, y: 10 },
   ];
 
   previewIds.forEach((crop, index) => {
     const offset = offsets[index];
-    drawPreviewToken(crop, center.x + offset.x, center.y + offset.y, CELL_SIZE * 0.52, 0.55);
+    drawPreviewToken(crop, center.x + offset.x, center.y + offset.y, CELL_SIZE * 0.42, 0.52);
   });
 }
 
@@ -4493,22 +4743,29 @@ function drawPlant(col, row, crop, enhancement, effect, isHovered) {
 
   if (effect.windAnchor > 0) {
     ctx.save();
-    ctx.strokeStyle = "rgba(36, 173, 160, 0.95)";
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([5, 4]);
+    ctx.fillStyle = "rgba(36, 173, 160, 0.92)";
     ctx.beginPath();
-    ctx.arc(center.x, center.y, radius + 7, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.roundRect(center.x - 16, center.y - 26, 18, 14, 6);
+    ctx.fill();
+    ctx.fillStyle = "#f1fffd";
+    ctx.font = '700 9px "Segoe UI", sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("바", center.x - 7, center.y - 18);
     ctx.restore();
   }
 
   if (effect.windSource > 0) {
     ctx.save();
-    ctx.strokeStyle = "rgba(104, 226, 209, 0.92)";
-    ctx.lineWidth = 2.2;
+    ctx.fillStyle = "rgba(104, 226, 209, 0.96)";
     ctx.beginPath();
-    ctx.arc(center.x, center.y, radius + 3, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.roundRect(center.x + 1, center.y - 26, 18, 14, 6);
+    ctx.fill();
+    ctx.fillStyle = "#154842";
+    ctx.font = '700 9px "Segoe UI", sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("복", center.x + 10, center.y - 18);
     ctx.restore();
   }
 
@@ -4866,10 +5123,17 @@ function renderPaletteGroup(target, items) {
     button.addEventListener("click", () => {
       state.selectedCropId = crop.id;
       saveLayoutToStorage();
-      renderPalette();
+      updatePaletteSelectionState();
+      renderPlannerEnhancementControl();
       draw();
     });
     target.appendChild(button);
+  });
+}
+
+function updatePaletteSelectionState() {
+  document.querySelectorAll(".crop-button[data-crop-id]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.cropId === state.selectedCropId);
   });
 }
 
@@ -4897,28 +5161,7 @@ function renderPalette() {
 }
 
 function renderProductionStats() {
-  const { cropCounts, cropYieldTotals, totalYield } = calculateCropProduction();
-
-  productionSummary.textContent = `시간당 총 생산량 ${totalYield.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개`;
-  if (state.boostPotionActive) {
-    productionSummary.textContent += " (붉은 정수 On)";
-  }
-
-  productionGrid.innerHTML = "";
-
-  CROPS.filter((crop) =>
-    (cropCounts.get(crop.id) ?? 0) > 0 || (cropYieldTotals.get(crop.id) ?? 0) > 0).forEach((crop) => {
-    const count = cropCounts.get(crop.id) ?? 0;
-    const yieldTotal = cropYieldTotals.get(crop.id) ?? 0;
-    const card = document.createElement("article");
-    card.className = "production-card";
-    card.innerHTML = `
-      <strong>${crop.name}</strong>
-      <p>심은 개수: ${count}개</p>
-      <p>시간당 생산량: ${yieldTotal.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}개</p>
-    `;
-    productionGrid.appendChild(card);
-  });
+  schedulePlannerAnalysisRender();
 }
 
 function calculateCropProduction() {
