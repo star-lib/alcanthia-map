@@ -812,6 +812,19 @@ function cellKey(col, row) {
   return `${col},${row}`;
 }
 
+function pushWindPreviewPlant(effect, cropId, enhancement) {
+  if (!effect.windPreviewPlants) {
+    effect.windPreviewPlants = [];
+  }
+  const normalizedEnhancement = Number.isFinite(enhancement) ? enhancement : 0;
+  const exists = effect.windPreviewPlants.some(
+    (preview) => preview.cropId === cropId && preview.enhancement === normalizedEnhancement,
+  );
+  if (!exists) {
+    effect.windPreviewPlants.push({ cropId, enhancement: normalizedEnhancement });
+  }
+}
+
 function parseKey(key) {
   const [col, row] = key.split(",").map(Number);
   return { col, row };
@@ -4225,7 +4238,7 @@ function buildPlannerAnalysis() {
       windAnchor: 0,
       windSource: 0,
       windTarget: 0,
-      windPreviewCropIds: [],
+      windPreviewPlants: [],
       windSpawned: Boolean(cell.plant?.spawnedByWind),
     });
   }
@@ -4274,9 +4287,7 @@ function buildPlannerAnalysis() {
       effects.get(cell.key).windAnchor += 1;
       effects.get(sourceKey).windSource += 1;
       effects.get(targetKey).windTarget += 1;
-      if (!effects.get(targetKey).windPreviewCropIds.includes(sourceCell.plant.cropId)) {
-        effects.get(targetKey).windPreviewCropIds.push(sourceCell.plant.cropId);
-      }
+      pushWindPreviewPlant(effects.get(targetKey), sourceCell.plant.cropId, 0);
     }
   }
 
@@ -4376,7 +4387,7 @@ function buildEffectMap() {
       windAnchor: 0,
       windSource: 0,
       windTarget: 0,
-      windPreviewCropIds: [],
+      windPreviewPlants: [],
       windSpawned: false,
     });
   }
@@ -4446,9 +4457,7 @@ function buildEffectMap() {
       effects.get(cell.key).windAnchor += 1;
       effects.get(sourceKey).windSource += 1;
       effects.get(targetKey).windTarget += 1;
-      if (!effects.get(targetKey).windPreviewCropIds.includes(sourcePlant.cropId)) {
-        effects.get(targetKey).windPreviewCropIds.push(sourcePlant.cropId);
-      }
+      pushWindPreviewPlant(effects.get(targetKey), sourcePlant.cropId, 0);
     }
   }
 
@@ -4610,22 +4619,43 @@ function drawStripedDiamond(points, options) {
 }
 
 function drawWindPreview(col, row, effect) {
-  if (!effect.windPreviewCropIds?.length) {
+  if (!effect.windPreviewPlants?.length) {
     return;
   }
 
   const center = gridToPixel(col, row);
   const points = polygonForCell(col, row);
-  const previewIds = effect.windPreviewCropIds
-    .map((cropId) => cropById.get(cropId))
+  const previewPlants = effect.windPreviewPlants
+    .map((preview) => {
+      const crop = cropById.get(preview.cropId);
+      return crop
+        ? { crop, enhancement: Number.isFinite(preview.enhancement) ? preview.enhancement : 0 }
+        : null;
+    })
     .filter(Boolean)
     .slice(0, 4);
 
-  if (!previewIds.length) {
+  if (!previewPlants.length) {
     return;
   }
 
-  const drawPreviewToken = (crop, x, y, size, alpha) => {
+  const drawEnhancementBadge = (x, y, size, enhancement) => {
+    const badgeWidth = size >= CELL_SIZE * 0.6 ? 22 : 18;
+    const badgeHeight = size >= CELL_SIZE * 0.6 ? 14 : 12;
+    ctx.save();
+    ctx.fillStyle = "rgba(54, 32, 14, 0.92)";
+    ctx.beginPath();
+    ctx.roundRect(x + size * 0.18, y - size * 0.34, badgeWidth, badgeHeight, 5);
+    ctx.fill();
+    ctx.fillStyle = "#fff7e5";
+    ctx.font = `700 ${size >= CELL_SIZE * 0.6 ? 9 : 8}px "Segoe UI", sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`+${enhancement}`, x + size * 0.18 + badgeWidth / 2, y - size * 0.34 + badgeHeight / 2);
+    ctx.restore();
+  };
+
+  const drawPreviewToken = ({ crop, enhancement }, x, y, size, alpha) => {
     const cropImage = cropImageCache.get(crop.id);
     const hasCropImage = cropImage?.complete && cropImage.naturalWidth > 0;
 
@@ -4653,10 +4683,12 @@ function drawWindPreview(col, row, effect) {
       ctx.fillText(crop.short, x, y + 1);
     }
     ctx.restore();
+
+    drawEnhancementBadge(x, y, size, enhancement);
   };
 
-  if (previewIds.length === 1) {
-    drawPreviewToken(previewIds[0], center.x, center.y, CELL_SIZE * 0.74, 0.4);
+  if (previewPlants.length === 1) {
+    drawPreviewToken(previewPlants[0], center.x, center.y, CELL_SIZE * 0.74, 0.4);
     return;
   }
 
@@ -4667,9 +4699,9 @@ function drawWindPreview(col, row, effect) {
     { x: 10, y: 10 },
   ];
 
-  previewIds.forEach((crop, index) => {
+  previewPlants.forEach((preview, index) => {
     const offset = offsets[index];
-    drawPreviewToken(crop, center.x + offset.x, center.y + offset.y, CELL_SIZE * 0.42, 0.52);
+    drawPreviewToken(preview, center.x + offset.x, center.y + offset.y, CELL_SIZE * 0.42, 0.52);
   });
 }
 
@@ -4769,13 +4801,13 @@ function drawPlant(col, row, crop, enhancement, effect, isHovered) {
     ctx.restore();
   }
 
-  if (enhancement > 0) {
+  if (enhancement > 0 || effect.windSpawned) {
     ctx.save();
-    ctx.fillStyle = "rgba(69, 40, 16, 0.92)";
+    ctx.fillStyle = effect.windSpawned ? "rgba(28, 114, 103, 0.94)" : "rgba(69, 40, 16, 0.92)";
     ctx.beginPath();
     ctx.roundRect(center.x + 6, center.y - 24, 22, 16, 6);
     ctx.fill();
-    ctx.fillStyle = "#fff6df";
+    ctx.fillStyle = effect.windSpawned ? "#f4fffb" : "#fff6df";
     ctx.font = '700 10px "Segoe UI", sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -4927,7 +4959,7 @@ function draw(options = {}) {
         effect,
         isHovered,
       );
-    } else if (effect.windPreviewCropIds?.length) {
+    } else if (effect.windPreviewPlants?.length) {
       drawWindPreview(col, row, effect);
     }
   }
