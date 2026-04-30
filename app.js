@@ -232,8 +232,8 @@ const TOOLS = [
     accentColor: "#d1b0ff",
     summary: "선택한 땅을 중독 상태로 고정",
     details: [
-      "선택한 땅에 중독 속성을 추가하거나 제거합니다.",
-      "중독된 땅 위 식물은 독 면역이 아니면 시뮬레이션 중 죽습니다.",
+      "선택한 땅에 지속형 중독 토양을 추가하거나 제거합니다.",
+      "독꽃은 중독 토양에서 더 빨리 자라고 생산량이 증가합니다.",
     ],
     hourlyYield: 0,
   },
@@ -241,6 +241,7 @@ const TOOLS = [
 
 const cropById = new Map([...CROPS, ...TOOLS].map((crop) => [crop.id, crop]));
 const cropImageCache = new Map();
+const plantedCropImageCache = new Map();
 const CAULDRON_TIERS = [
   { id: "gold", name: "금 가마솥", iconPath: "./cauldron_icons/gold_cauldron.png" },
   { id: "silver", name: "은 가마솥", iconPath: "./cauldron_icons/silver_cauldron.png" },
@@ -291,6 +292,20 @@ const PLANT_SPECS = {
   sunlight_flower: { growTimeMs: 35000, waterIntervalMs: 25000, maxHarvests: Number.POSITIVE_INFINITY, produce: null },
   illusion_fern: { growTimeMs: 25000, waterIntervalMs: 30000, maxHarvests: 500, produce: { intervalMs: 480000 } },
   sunset_bush: { growTimeMs: 25000, waterIntervalMs: 25000, maxHarvests: 200, produce: { intervalMs: 10000 } },
+};
+const PLANTED_CROP_ICON_PATHS = {
+  herb: "./plant_icons/herb.png",
+  "red-leaf": "./plant_icons/red-leaf.png",
+  "water-flower": "./plant_icons/water-flower.png",
+  moss: "./plant_icons/moss.png",
+  "poison-flower": "./plant_icons/poison-flower.png",
+  mushroom: "./plant_icons/mushroom.png",
+  "star-flower": "./plant_icons/star-flower.png",
+  "fire-flower": "./plant_icons/fire-flower.png",
+  "wind-flower": "./plant_icons/wind-flower.png",
+  "phantom-fern": "./plant_icons/phantom-fern.png",
+  "sunset-tree": "./plant_icons/sunset-tree.png",
+  "sun-flower": "./plant_icons/sun-flower.png",
 };
 const PLANNER_SIMULATION = {
   startMs: 1000,
@@ -733,7 +748,7 @@ const state = {
   addSlots: [],
   plants: new Map(),
   desertTiles: new Set(),
-  poisonTiles: new Set(),
+  toxicTiles: new Set(),
   layoutSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
   cauldronSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
   activeSlotMode: "layout",
@@ -896,8 +911,8 @@ function basePlannerCellConditions(key) {
   if (state.desertTiles.has(key)) {
     conditions.push("arid");
   }
-  if (state.poisonTiles.has(key)) {
-    conditions.push("poisonous");
+  if (state.toxicTiles.has(key)) {
+    conditions.push("toxic");
   }
   return conditions;
 }
@@ -916,7 +931,7 @@ function currentLayoutPayload() {
       .map(([key, placement]) => [key, normalizePlantPlacement(placement)])
       .filter((entry) => entry[1]),
     desertTiles: [...state.desertTiles],
-    poisonTiles: [...state.poisonTiles],
+    toxicTiles: [...state.toxicTiles],
     selectedCropId: state.selectedCropId,
     selectedCropEnhancement: clampEnhancementLevel(state.selectedCropEnhancement),
   };
@@ -945,16 +960,19 @@ function applyLayoutPayload(payload) {
       ? payload.desertTiles.filter((value) => typeof value === "string")
       : [],
   );
-  const poisonTiles = new Set(
-    Array.isArray(payload?.poisonTiles)
-      ? payload.poisonTiles.filter((value) => typeof value === "string")
-      : [],
+  const toxicTileSource = Array.isArray(payload?.toxicTiles)
+    ? payload.toxicTiles
+    : Array.isArray(payload?.poisonTiles)
+      ? payload.poisonTiles
+      : [];
+  const toxicTiles = new Set(
+    toxicTileSource.filter((value) => typeof value === "string"),
   );
 
   state.cells = cells.size ? cells : createStartingCells();
   state.plants = new Map([...plants].filter(([key]) => state.cells.has(key)));
   state.desertTiles = new Set([...desertTiles].filter((key) => state.cells.has(key)));
-  state.poisonTiles = new Set([...poisonTiles].filter((key) => state.cells.has(key)));
+  state.toxicTiles = new Set([...toxicTiles].filter((key) => state.cells.has(key)));
 
   if (cropById.has(payload?.selectedCropId)) {
     state.selectedCropId = payload.selectedCropId;
@@ -3805,10 +3823,39 @@ function plannerSimulationCacheKey() {
     cells: [...state.cells].sort(),
     plants: [...state.plants.entries()].sort((a, b) => a[0].localeCompare(b[0])),
     desertTiles: [...state.desertTiles].sort(),
-    poisonTiles: [...state.poisonTiles].sort(),
+    toxicTiles: [...state.toxicTiles].sort(),
     boostPotionActive: state.boostPotionActive,
     skillLevels: plannerSkillLevels(),
   });
+}
+
+function preloadPlantedCropImages() {
+  Object.entries(PLANTED_CROP_ICON_PATHS).forEach(([cropId, iconPath]) => {
+    if (!iconPath || plantedCropImageCache.has(cropId)) {
+      return;
+    }
+
+    const image = new Image();
+    image.decoding = "async";
+    image.loading = "eager";
+    image.src = iconPath;
+    image.addEventListener("load", () => {
+      draw();
+    });
+    plantedCropImageCache.set(cropId, image);
+  });
+}
+
+function getPlannerCropImage(cropId) {
+  const plantedImage = plantedCropImageCache.get(cropId);
+  if (plantedImage?.complete && plantedImage.naturalWidth > 0) {
+    return plantedImage;
+  }
+  const cropImage = cropImageCache.get(cropId);
+  if (cropImage?.complete && cropImage.naturalWidth > 0) {
+    return cropImage;
+  }
+  return null;
 }
 
 function plannerFieldEnhancement(col, row) {
@@ -3979,9 +4026,6 @@ function buildPlannerAnalysis() {
     for (const cell of cells.values()) {
       cell.conditions = cell.conditions.filter((condition) =>
         condition !== "humid" && condition !== "poisonous" && condition !== "sunlit");
-      if (state.poisonTiles.has(cell.key) && !cell.conditions.includes("poisonous")) {
-        cell.conditions.push("poisonous");
-      }
     }
 
     for (const cell of cells.values()) {
@@ -4268,6 +4312,7 @@ function buildPlannerAnalysis() {
   for (const cell of cells.values()) {
     effects.set(cell.key, {
       watered: cell.conditions.includes("humid") ? 1 : 0,
+      toxic: cell.conditions.includes("toxic") ? 1 : 0,
       poisoned: cell.conditions.includes("poisonous") || cell.plant?.conditions.includes("poisoned") ? 1 : 0,
       sunBuff: cell.conditions.includes("sunlit") ? 1 : 0,
       dead: Boolean(cell.plant && cell.plant.health <= 0),
@@ -4417,6 +4462,7 @@ function buildEffectMap() {
   for (const cell of cells.values()) {
     effects.set(cell.key, {
       watered: 0,
+      toxic: cell.conditions.includes("toxic") ? 1 : 0,
       poisoned: 0,
       sunBuff: 0,
       dead: false,
@@ -4587,10 +4633,20 @@ function drawEffectOverlay(points, effect) {
     });
   }
 
+  if (effect.toxic > 0) {
+    drawStripedDiamond(points, {
+      fill: "rgba(198, 150, 255, 0.78)",
+      stroke: "#7f51c6",
+      stripe: "#9b69e6",
+      lineWidth: 1.6,
+      stripeSpacing: 10,
+    });
+  }
+
   if (effect.poisoned > 0) {
     drawDiamond(points, {
-      fill: "#b382ef",
-      stroke: "#7744b4",
+      fill: "#a165e5",
+      stroke: "#6e3bad",
       lineWidth: 1.6,
     });
   }
@@ -4692,8 +4748,8 @@ function drawWindPreview(col, row, effect) {
   };
 
   const drawPreviewToken = ({ crop, enhancement }, x, y, size, alpha) => {
-    const cropImage = cropImageCache.get(crop.id);
-    const hasCropImage = cropImage?.complete && cropImage.naturalWidth > 0;
+    const cropImage = getPlannerCropImage(crop.id);
+    const hasCropImage = Boolean(cropImage);
 
     ctx.save();
     ctx.beginPath();
@@ -4744,8 +4800,8 @@ function drawWindPreview(col, row, effect) {
 function drawPlant(col, row, crop, enhancement, effect, isHovered) {
   const center = gridToPixel(col, row);
   const radius = CELL_SIZE * 0.4;
-  const cropImage = cropImageCache.get(crop.id);
-  const hasCropImage = cropImage?.complete && cropImage.naturalWidth > 0;
+  const cropImage = getPlannerCropImage(crop.id);
+  const hasCropImage = Boolean(cropImage);
   const gradient = ctx.createLinearGradient(
     center.x - radius,
     center.y - radius,
@@ -4874,9 +4930,10 @@ function drawPlant(col, row, crop, enhancement, effect, isHovered) {
     ctx.restore();
   }
 
-  if (effect.watered > 0 || effect.poisoned > 0 || effect.sunBuff > 0) {
+  if (effect.watered > 0 || effect.toxic > 0 || effect.poisoned > 0 || effect.sunBuff > 0) {
     const markers = [];
     if (effect.watered > 0) markers.push({ color: "#4ea7d8", text: `W${effect.watered}` });
+    if (effect.toxic > 0) markers.push({ color: "#8e5fce", text: `T${effect.toxic}` });
     if (effect.poisoned > 0) markers.push({ color: "#8f6ab4", text: `P${effect.poisoned}` });
     if (effect.sunBuff > 0) markers.push({ color: "#f0c445", text: `S${effect.sunBuff}` });
 
@@ -5425,7 +5482,7 @@ function applyClick(point) {
     state.cells.delete(cell.key);
     state.plants.delete(cell.key);
     state.desertTiles.delete(cell.key);
-    state.poisonTiles.delete(cell.key);
+    state.toxicTiles.delete(cell.key);
     if (state.cells.size === 0) {
       state.cells = createStartingCells();
     }
@@ -5436,10 +5493,10 @@ function applyClick(point) {
       state.desertTiles.add(cell.key);
     }
   } else if (state.selectedCropId === "poison-tile") {
-    if (state.poisonTiles.has(cell.key)) {
-      state.poisonTiles.delete(cell.key);
+    if (state.toxicTiles.has(cell.key)) {
+      state.toxicTiles.delete(cell.key);
     } else {
-      state.poisonTiles.add(cell.key);
+      state.toxicTiles.add(cell.key);
     }
   } else {
     const existingPlacement = normalizePlantPlacement(state.plants.get(cell.key));
@@ -5622,7 +5679,7 @@ canvas.addEventListener("contextmenu", (event) => {
   state.cells.delete(cell.key);
   state.plants.delete(cell.key);
   state.desertTiles.delete(cell.key);
-  state.poisonTiles.delete(cell.key);
+  state.toxicTiles.delete(cell.key);
 
   for (const [key] of state.plants) {
     if (!state.cells.has(key)) {
@@ -5873,7 +5930,7 @@ resetButton.addEventListener("click", () => {
   state.cells = createStartingCells();
   state.plants.clear();
   state.desertTiles.clear();
-  state.poisonTiles.clear();
+  state.toxicTiles.clear();
   state.hover = null;
   state.hoverPoint = null;
   saveLayoutToStorage();
@@ -5902,7 +5959,8 @@ window.render_game_to_text = () =>
       })
       .filter(Boolean),
     desertTiles: [...state.desertTiles].map(parseKey),
-    poisonTiles: [...state.poisonTiles].map(parseKey),
+    toxicTiles: [...state.toxicTiles].map(parseKey),
+    poisonTiles: [...state.toxicTiles].map(parseKey),
     expandableSlots: state.addSlots,
     skillCategory: state.activeSkillCategory,
     skillPointsSpent: skillPointTotals(),
@@ -5930,7 +5988,8 @@ window.__planner_debug = {
       })
       .filter(Boolean),
   getDesertTiles: () => [...state.desertTiles].map(parseKey),
-  getPoisonTiles: () => [...state.poisonTiles].map(parseKey),
+  getToxicTiles: () => [...state.toxicTiles].map(parseKey),
+  getPoisonTiles: () => [...state.toxicTiles].map(parseKey),
   gridToScreen: (col, row) => {
     const center = gridToPixel(col, row);
     return worldToScreen(center.x, center.y);
@@ -5957,6 +6016,7 @@ loadTimeCalculatorInputs();
 loadSkillTreeFromStorage();
 loadSkillPointInputs();
 preloadCropImages();
+preloadPlantedCropImages();
 const loadedSharedLayout = loadLayoutFromUrl();
 if (!loadedSharedLayout) {
   loadLayoutFromStorage();
