@@ -243,7 +243,7 @@ const TOOLS = [
     short: "허",
     color: "#8b5a2b",
     accentColor: "#d9ad63",
-    iconPath: "./alcanthia_assets/general/witch_scarecrow.png",
+    iconPath: "./crop_icons/witch_scarecrow.png",
     summary: "인접 4칸 자동 수확 방지",
     details: [
       "배치한 칸의 상하좌우 인접 4칸 작물은 자동 수확되지 않습니다.",
