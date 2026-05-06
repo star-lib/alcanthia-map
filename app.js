@@ -251,6 +251,20 @@ const TOOLS = [
     ],
     hourlyYield: 0,
   },
+  {
+    id: "gale-potion",
+    name: "돌풍포션",
+    short: "돌",
+    color: "#4cb6c4",
+    accentColor: "#bdf4ff",
+    iconPath: "./crop_icons/gale_potion.png",
+    summary: "바람꽃 수분 범위 +1",
+    details: [
+      "원본 게임 기준 효과입니다.",
+      "활성화하면 바람꽃의 수분 범위가 1칸 증가합니다.",
+    ],
+    hourlyYield: 0,
+  },
 ];
 
 const cropById = new Map([...CROPS, ...TOOLS].map((crop) => [crop.id, crop]));
@@ -764,6 +778,7 @@ const state = {
   desertTiles: new Set(),
   toxicTiles: new Set(),
   scarecrowTiles: new Set(),
+  galePotionActive: false,
   layoutSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
   cauldronSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
   activeSlotMode: "layout",
@@ -948,6 +963,7 @@ function currentLayoutPayload() {
     desertTiles: [...state.desertTiles],
     toxicTiles: [...state.toxicTiles],
     scarecrowTiles: [...state.scarecrowTiles],
+    galePotionActive: state.galePotionActive,
     selectedCropId: state.selectedCropId,
     selectedCropEnhancement: clampEnhancementLevel(state.selectedCropEnhancement),
   };
@@ -989,12 +1005,12 @@ function applyLayoutPayload(payload) {
       ? payload.scarecrowTiles.filter((value) => typeof value === "string")
       : [],
   );
-
   state.cells = cells.size ? cells : createStartingCells();
   state.plants = new Map([...plants].filter(([key]) => state.cells.has(key)));
   state.desertTiles = new Set([...desertTiles].filter((key) => state.cells.has(key)));
   state.toxicTiles = new Set([...toxicTiles].filter((key) => state.cells.has(key)));
   state.scarecrowTiles = new Set([...scarecrowTiles].filter((key) => state.cells.has(key)));
+  state.galePotionActive = Boolean(payload?.galePotionActive);
 
   if (cropById.has(payload?.selectedCropId)) {
     state.selectedCropId = payload.selectedCropId;
@@ -3847,6 +3863,7 @@ function plannerSimulationCacheKey() {
     desertTiles: [...state.desertTiles].sort(),
     toxicTiles: [...state.toxicTiles].sort(),
     scarecrowTiles: [...state.scarecrowTiles].sort(),
+    galePotionActive: state.galePotionActive,
     boostPotionActive: state.boostPotionActive,
     skillLevels: plannerSkillLevels(),
   });
@@ -4014,6 +4031,7 @@ function buildPlannerAnalysis() {
       .filter((key) => cells.has(key));
   const hasAdjacentScarecrow = (cell) =>
     orthogonalNeighborKeys(cell).some((neighborKey) => state.scarecrowTiles.has(neighborKey));
+  const windRange = 1 + (state.galePotionActive ? 1 : 0);
 
   const rangeKeys = (cell, range) => {
     if (range >= 1) {
@@ -4216,37 +4234,43 @@ function buildPlannerAnalysis() {
     }
 
     const pendingWindSpawns = [];
-    for (const cell of cells.values()) {
-      if (!isMature(cell, currentMs) || cell.plant.id !== "wind_blossom") {
-        continue;
-      }
-
+    const applyWindAnchorSpawn = (cell) => {
       const pollinationInterval = PLANT_SPECS.wind_blossom.produce?.intervalMs ?? Number.POSITIVE_INFINITY;
-      if (currentMs - (cell.plant.lastPollinateAt ?? 0) < pollinationInterval) {
-        continue;
+      if (currentMs - (cell.lastPollinateAt ?? 0) < pollinationInterval) {
+        return;
       }
 
-      cell.plant.lastPollinateAt = currentMs;
+      cell.lastPollinateAt = currentMs;
       for (const delta of cardinalDeltas) {
-        const sourceKey = cellKey(cell.col + delta.col, cell.row + delta.row);
-        const sourceCell = cells.get(sourceKey);
-        const sourcePlant = sourceCell?.plant;
-        if (!sourcePlant || sourcePlant.health <= 0 || sourcePlant.growStartedAt == null || sourcePlant.id === "wind_blossom") {
-          continue;
-        }
+        for (let distance = 1; distance <= windRange; distance += 1) {
+          const sourceKey = cellKey(cell.col + delta.col * distance, cell.row + delta.row * distance);
+          const sourceCell = cells.get(sourceKey);
+          const sourcePlant = sourceCell?.plant;
+          if (!sourcePlant || sourcePlant.health <= 0 || sourcePlant.growStartedAt == null || sourcePlant.id === "wind_blossom") {
+            break;
+          }
 
-        const targetKey = cellKey(cell.col + delta.col * 2, cell.row + delta.row * 2);
-        const targetCell = cells.get(targetKey);
-        if (!targetCell || targetCell.plant) {
-          continue;
-        }
+          const targetKey = cellKey(cell.col + delta.col * (distance + 1), cell.row + delta.row * (distance + 1));
+          const targetCell = cells.get(targetKey);
+          if (!targetCell || targetCell.plant) {
+            continue;
+          }
 
-        pendingWindSpawns.push({
-          targetKey,
-          cropId: sourcePlant.cropId,
-          plantId: sourcePlant.id,
-          enhancement: 0,
-        });
+          pendingWindSpawns.push({
+            targetKey,
+            cropId: sourcePlant.cropId,
+            plantId: sourcePlant.id,
+            enhancement: 0,
+          });
+        }
+      }
+    };
+
+    for (const cell of cells.values()) {
+      if (isMature(cell, currentMs) && cell.plant.id === "wind_blossom") {
+        cell.lastPollinateAt = cell.plant.lastPollinateAt ?? cell.lastPollinateAt;
+        applyWindAnchorSpawn(cell);
+        cell.plant.lastPollinateAt = cell.lastPollinateAt;
       }
     }
 
@@ -4388,29 +4412,32 @@ function buildPlannerAnalysis() {
     }
   }
 
-  for (const cell of cells.values()) {
-    if (!isSnapshotMature(cell) || cell.plant.id !== "wind_blossom") {
-      continue;
-    }
-
+  const applyWindAnchorPreview = (cell) => {
+    const windRange = 1 + (state.galePotionActive ? 1 : 0);
     for (const delta of cardinalDeltas) {
-      const sourceKey = cellKey(cell.col + delta.col, cell.row + delta.row);
-      const targetKey = cellKey(cell.col + delta.col * 2, cell.row + delta.row * 2);
-      const sourceCell = cells.get(sourceKey);
-      const targetCell = cells.get(targetKey);
-      if (
-        !sourceCell
-        || !targetCell
-        || !isSnapshotPollinationSource(sourceCell)
-        || targetCell.plant
-      ) {
-        continue;
-      }
+      for (let distance = 1; distance <= windRange; distance += 1) {
+        const sourceKey = cellKey(cell.col + delta.col * distance, cell.row + delta.row * distance);
+        const targetKey = cellKey(cell.col + delta.col * (distance + 1), cell.row + delta.row * (distance + 1));
+        const sourceCell = cells.get(sourceKey);
+        const targetCell = cells.get(targetKey);
+        if (!sourceCell || !isSnapshotPollinationSource(sourceCell)) {
+          break;
+        }
+        if (!targetCell || targetCell.plant) {
+          continue;
+        }
 
-      effects.get(cell.key).windAnchor += 1;
-      effects.get(sourceKey).windSource += 1;
-      effects.get(targetKey).windTarget += 1;
-      pushWindPreviewPlant(effects.get(targetKey), sourceCell.plant.cropId, 0);
+        effects.get(cell.key).windAnchor += 1;
+        effects.get(sourceKey).windSource += 1;
+        effects.get(targetKey).windTarget += 1;
+        pushWindPreviewPlant(effects.get(targetKey), sourceCell.plant.cropId, 0);
+      }
+    }
+  };
+
+  for (const cell of cells.values()) {
+    if (isSnapshotMature(cell) && cell.plant.id === "wind_blossom") {
+      applyWindAnchorPreview(cell);
     }
   }
 
@@ -4572,26 +4599,34 @@ function buildEffectMap() {
     }
   }
 
+  const applyWindAnchorEffect = (cell) => {
+    const windRange = 1 + (state.galePotionActive ? 1 : 0);
+    for (const delta of cardinalDeltas) {
+      for (let distance = 1; distance <= windRange; distance += 1) {
+        const sourceKey = cellKey(cell.col + delta.col * distance, cell.row + delta.row * distance);
+        const targetKey = cellKey(cell.col + delta.col * (distance + 1), cell.row + delta.row * (distance + 1));
+        const sourceCell = cells.get(sourceKey);
+        const targetCell = cells.get(targetKey);
+        const sourcePlant = sourceCell?.plant;
+        if (!sourcePlant || sourcePlant.id === "wind_blossom") {
+          break;
+        }
+        if (!targetCell || targetCell.plant) {
+          continue;
+        }
+
+        effects.get(cell.key).windAnchor += 1;
+        effects.get(sourceKey).windSource += 1;
+        effects.get(targetKey).windTarget += 1;
+        pushWindPreviewPlant(effects.get(targetKey), sourcePlant.cropId, 0);
+      }
+    }
+  };
+
   for (const cell of cells.values()) {
     const plant = cell.plant;
-    if (!plant || plant.id !== "wind_blossom") {
-      continue;
-    }
-
-    for (const delta of cardinalDeltas) {
-      const sourceKey = cellKey(cell.col + delta.col, cell.row + delta.row);
-      const targetKey = cellKey(cell.col + delta.col * 2, cell.row + delta.row * 2);
-      const sourceCell = cells.get(sourceKey);
-      const targetCell = cells.get(targetKey);
-      const sourcePlant = sourceCell?.plant;
-      if (!sourcePlant || sourcePlant.id === "wind_blossom" || !targetCell || targetCell.plant) {
-        continue;
-      }
-
-      effects.get(cell.key).windAnchor += 1;
-      effects.get(sourceKey).windSource += 1;
-      effects.get(targetKey).windTarget += 1;
-      pushWindPreviewPlant(effects.get(targetKey), sourcePlant.cropId, 0);
+    if (plant && plant.id === "wind_blossom") {
+      applyWindAnchorEffect(cell);
     }
   }
 
@@ -5211,6 +5246,12 @@ function drawShieldBadge(x, y) {
   ctx.restore();
 }
 
+function queueScarecrowProtectionBadge(deferredTextDraws, x, y) {
+  deferredTextDraws.push(() => {
+    drawShieldBadge(x, y);
+  });
+}
+
 function draw(options = {}) {
   const {
     includeAddSlots = true,
@@ -5287,6 +5328,9 @@ function draw(options = {}) {
     } else if (effect.windPreviewPlants?.length) {
       drawWindPreview(col, row, effect);
     }
+    if (!placement && !hasScarecrow && effect.scarecrowProtected > 0) {
+      queueScarecrowProtectionBadge(deferredTextDraws, center.x, center.y + 16);
+    }
   }
 
   if (includeAddSlots) {
@@ -5322,6 +5366,7 @@ function draw(options = {}) {
     ? `${selectedCrop.name} +${selectedCropEnhancementLevel()}`
     : selectedCrop.name;
   summary.textContent = `총 ${state.cells.size}칸, 작물 ${plantedCount}개. 점선 칸은 확장, 밭 칸은 ${selectedCropLabel} 심기입니다.`;
+  summary.textContent = `총 ${state.cells.size}칸, 작물 ${plantedCount}개. 점선 칸은 확장, 밭 칸은 ${selectedCropLabel} 심기입니다.${state.galePotionActive ? " 돌풍포션 효과 On." : ""}`;
   updateSlotTooltip();
   renderProductionStats();
 }
@@ -5460,7 +5505,10 @@ function renderPaletteGroup(target, items) {
       : crop.hourlyYield;
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `crop-button${crop.id === state.selectedCropId ? " active" : ""}`;
+    const isActiveTool = crop.id === "gale-potion"
+      ? state.galePotionActive
+      : crop.id === state.selectedCropId;
+    button.className = `crop-button${isActiveTool ? " active" : ""}`;
     button.dataset.cropId = crop.id;
     const hasIconImage = Boolean(crop.iconPath);
     button.innerHTML = `
@@ -5479,6 +5527,13 @@ function renderPaletteGroup(target, items) {
       </span>
     `;
     button.addEventListener("click", () => {
+      if (crop.id === "gale-potion") {
+        state.galePotionActive = !state.galePotionActive;
+        saveLayoutToStorage();
+        updatePaletteSelectionState();
+        draw();
+        return;
+      }
       state.selectedCropId = crop.id;
       saveLayoutToStorage();
       updatePaletteSelectionState();
@@ -5491,7 +5546,10 @@ function renderPaletteGroup(target, items) {
 
 function updatePaletteSelectionState() {
   document.querySelectorAll(".crop-button[data-crop-id]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.cropId === state.selectedCropId);
+    const isActive = button.dataset.cropId === "gale-potion"
+      ? state.galePotionActive
+      : button.dataset.cropId === state.selectedCropId;
+    button.classList.toggle("active", isActive);
   });
 }
 
@@ -5941,6 +5999,10 @@ canvas.addEventListener("contextmenu", (event) => {
 
 clearCropsButton.addEventListener("click", () => {
   state.plants.clear();
+  state.desertTiles.clear();
+  state.toxicTiles.clear();
+  state.scarecrowTiles.clear();
+  state.galePotionActive = false;
   saveLayoutToStorage();
   draw();
 });
@@ -6174,6 +6236,7 @@ resetButton.addEventListener("click", () => {
   state.desertTiles.clear();
   state.toxicTiles.clear();
   state.scarecrowTiles.clear();
+  state.galePotionActive = false;
   state.hover = null;
   state.hoverPoint = null;
   saveLayoutToStorage();
@@ -6205,6 +6268,7 @@ window.render_game_to_text = () =>
     toxicTiles: [...state.toxicTiles].map(parseKey),
     poisonTiles: [...state.toxicTiles].map(parseKey),
     scarecrowTiles: [...state.scarecrowTiles].map(parseKey),
+    galePotionActive: state.galePotionActive,
     expandableSlots: state.addSlots,
     skillCategory: state.activeSkillCategory,
     skillPointsSpent: skillPointTotals(),
@@ -6235,6 +6299,12 @@ window.__planner_debug = {
   getToxicTiles: () => [...state.toxicTiles].map(parseKey),
   getPoisonTiles: () => [...state.toxicTiles].map(parseKey),
   getScarecrowTiles: () => [...state.scarecrowTiles].map(parseKey),
+  getGalePotionActive: () => state.galePotionActive,
+  getEffectMapSnapshot: () =>
+    [...buildEffectMap().entries()].map(([key, effect]) => ({
+      ...parseKey(key),
+      ...effect,
+    })),
   gridToScreen: (col, row) => {
     const center = gridToPixel(col, row);
     return worldToScreen(center.x, center.y);
