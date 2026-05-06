@@ -1217,14 +1217,27 @@ function decodeLayoutPayload(encoded) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
+function remoteOrnamentKeys(ornament) {
+  if (!ornament || typeof ornament !== "object") {
+    return [];
+  }
+
+  const rawKeys = [
+    ornament?.itemCode,
+    ornament?.id,
+    ornament?.itemKey,
+    ...(Array.isArray(ornament?.items)
+      ? ornament.items.flatMap((item) => [item?.itemCode, item?.id, item?.itemKey])
+      : []),
+  ];
+
+  return rawKeys
+    .filter((value) => value != null && value !== "")
+    .map((value) => String(value).toLowerCase());
+}
+
 function remoteOrnamentIsScarecrow(ornament) {
-  const key = String(
-    ornament?.itemCode
-    ?? ornament?.id
-    ?? ornament?.itemKey
-    ?? "",
-  ).toLowerCase();
-  return key.includes("scarecrow");
+  return remoteOrnamentKeys(ornament).some((key) => key.includes("scarecrow"));
 }
 
 function collectMappedFriendCells(profile) {
@@ -4333,8 +4346,12 @@ function borderLayer(col, row) {
   return Math.max(colGap, rowGap);
 }
 
-function expansionCostText(enhancement) {
-  return `${enhancement}강 마력결정 1개 + ${enhancement}강 각인석 1개`;
+function requiredExpansionEnhancement(col, row) {
+  return plannerFieldEnhancement(col, row) + 1;
+}
+
+function expansionCostText(requiredEnhancement) {
+  return `${requiredEnhancement}강 마력결정 1개 + ${requiredEnhancement}강 각인석 1개`;
 }
 
 function getAdjacentNeighbors(col, row) {
@@ -6293,11 +6310,11 @@ function updateSlotTooltip() {
   }
 
   const { col, row } = parseKey(state.hover.key);
-  const layer = plannerFieldEnhancement(col, row);
+  const requiredEnhancement = requiredExpansionEnhancement(col, row);
   slotTooltip.innerHTML = `
     <strong>확장 비용</strong>
-    강화 단계 ${layer}<br />
-    ${expansionCostText(layer)}
+    강화 단계 ${requiredEnhancement}<br />
+    ${expansionCostText(requiredEnhancement)}
   `;
   slotTooltip.hidden = false;
   slotTooltip.style.left = `${Math.min(state.hoverPoint.x + 18, canvas.clientWidth - 220)}px`;
