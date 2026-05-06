@@ -1,8 +1,11 @@
-const STARTING_ROWS = [4, 3, 4, 3, 4, 3, 4];
 const CELL_SIZE = 44;
-const HALF_W = CELL_SIZE;
-const HALF_H = CELL_SIZE * 0.58;
+const HALF_W = CELL_SIZE / 2;
+const HALF_H = CELL_SIZE / 2;
 const GRID_PAD = 2;
+const RENDER_ROTATION = Math.PI / 4;
+const RENDER_COS = Math.cos(RENDER_ROTATION);
+const RENDER_SIN = Math.sin(RENDER_ROTATION);
+const RENDER_VERTICAL_SCALE = 0.58;
 const MIN_SCALE = 0.45;
 const MAX_SCALE = 2.8;
 const ZOOM_FACTOR = 1.12;
@@ -307,6 +310,7 @@ const CROP_TO_PLANT_ID = {
   "sunset-tree": "sunset_bush",
   "sun-flower": "sunlight_flower",
 };
+const plantIdToCropId = new Map(Object.entries(CROP_TO_PLANT_ID).map(([cropId, plantId]) => [plantId, cropId]));
 const PLANT_SPECS = {
   herb: { growTimeMs: 10000, waterIntervalMs: Number.POSITIVE_INFINITY, maxHarvests: 1, produce: { intervalMs: 1 } },
   red_flower: { growTimeMs: 10000, waterIntervalMs: 20000, maxHarvests: 500, produce: { intervalMs: 15000 } },
@@ -533,6 +537,11 @@ openLayoutSlotsButton.id = "layout-slots-button";
 openLayoutSlotsButton.type = "button";
 openLayoutSlotsButton.textContent = "저장/불러오기";
 toolbarActions.appendChild(openLayoutSlotsButton);
+const openFriendImportButton = document.createElement("button");
+openFriendImportButton.id = "friend-lookup-button";
+openFriendImportButton.type = "button";
+openFriendImportButton.textContent = "인게임 유저 조회";
+toolbarActions.appendChild(openFriendImportButton);
 const slotPanel = document.createElement("section");
 slotPanel.className = "slot-panel";
 slotPanel.innerHTML = `
@@ -559,6 +568,86 @@ slotModalBackdrop.className = "slot-modal-backdrop";
 slotModalBackdrop.setAttribute("aria-label", "저장/불러오기 닫기");
 slotModalBackdrop.hidden = true;
 document.body.appendChild(slotModalBackdrop);
+const friendImportDialog = document.createElement("section");
+friendImportDialog.className = "slot-panel friend-lookup-modal";
+friendImportDialog.innerHTML = `
+  <div class="friend-lookup-header">
+    <div>
+      <h3>인게임 유저 조회</h3>
+      <p>공개된 밭과 스킬 투자 정보를 조회하고 현재 플래너에 바로 적용합니다.</p>
+    </div>
+  </div>
+  <section class="friend-import-panel">
+    <div class="friend-import-controls">
+      <label class="field field-wide">
+        <span>닉네임</span>
+        <input id="friend-nickname-input" type="text" maxlength="20" placeholder="예: 별빛도서관" />
+      </label>
+      <button id="friend-import-button" class="slot-action-button" type="button">조회</button>
+    </div>
+  </section>
+  <p id="friend-import-status" class="friend-import-status">닉네임을 입력한 뒤 조회를 눌러 주세요.</p>
+  <section id="friend-import-result" class="friend-import-result" hidden>
+    <div class="friend-import-summary-card">
+      <div class="friend-import-title-row">
+        <strong id="friend-result-nickname">-</strong>
+        <span id="friend-result-theme" class="friend-result-badge">테마 -</span>
+      </div>
+    <div id="friend-result-overview" class="friend-import-overview"></div>
+  </div>
+  <div class="friend-import-grid">
+      <article class="friend-import-info-card friend-import-preview-card">
+        <h4>밭 미리보기</h4>
+        <div id="friend-field-preview" class="friend-field-preview"></div>
+      </article>
+      <article class="friend-import-info-card">
+        <h4>밭 정보</h4>
+        <div id="friend-field-summary" class="friend-import-info-list"></div>
+      </article>
+      <article class="friend-import-info-card friend-import-skill-card">
+        <h4>스킬 정보</h4>
+        <div id="friend-skill-summary" class="friend-import-info-list"></div>
+      </article>
+      <article class="friend-import-info-card">
+        <h4>기타 정보</h4>
+        <div id="friend-other-summary" class="friend-import-info-list"></div>
+      </article>
+    </div>
+    <div class="friend-import-actions">
+      <button id="friend-apply-field-button" class="slot-action-button" type="button">밭 불러오기</button>
+      <button id="friend-apply-skills-button" class="slot-action-button subtle" type="button">스킬 불러오기</button>
+      <button id="friend-apply-all-button" class="slot-action-button" type="button">모두 불러오기</button>
+    </div>
+  </section>
+`;
+const friendImportCloseButton = document.createElement("button");
+friendImportCloseButton.type = "button";
+friendImportCloseButton.className = "friend-lookup-close";
+friendImportCloseButton.dataset.action = "close-friend-dialog";
+friendImportCloseButton.textContent = "닫기";
+friendImportDialog.querySelector(".friend-lookup-header").appendChild(friendImportCloseButton);
+friendImportDialog.hidden = true;
+document.body.appendChild(friendImportDialog);
+const friendImportBackdrop = document.createElement("button");
+friendImportBackdrop.type = "button";
+friendImportBackdrop.className = "slot-modal-backdrop";
+friendImportBackdrop.setAttribute("aria-label", "인게임 유저 조회 닫기");
+friendImportBackdrop.hidden = true;
+document.body.appendChild(friendImportBackdrop);
+const friendNicknameInput = document.getElementById("friend-nickname-input");
+const friendImportButton = document.getElementById("friend-import-button");
+const friendImportStatus = document.getElementById("friend-import-status");
+const friendImportResult = document.getElementById("friend-import-result");
+const friendResultNickname = document.getElementById("friend-result-nickname");
+const friendResultTheme = document.getElementById("friend-result-theme");
+const friendResultOverview = document.getElementById("friend-result-overview");
+const friendFieldPreview = document.getElementById("friend-field-preview");
+const friendFieldSummary = document.getElementById("friend-field-summary");
+const friendSkillSummary = document.getElementById("friend-skill-summary");
+const friendOtherSummary = document.getElementById("friend-other-summary");
+const friendApplyFieldButton = document.getElementById("friend-apply-field-button");
+const friendApplySkillsButton = document.getElementById("friend-apply-skills-button");
+const friendApplyAllButton = document.getElementById("friend-apply-all-button");
 const tabButtons = [...document.querySelectorAll(".tab-button")];
 const plannerView = document.getElementById("planner-view");
 const calculatorView = document.getElementById("calculator-view");
@@ -614,6 +703,7 @@ openCauldronSlotsButton.textContent = "저장/불러오기";
 cauldronBoard.before(openCauldronSlotsButton);
 
 const STORAGE_KEY = "alchansia-layout-v1";
+const LAYOUT_VERSION = 3;
 const SLOT_STORAGE_KEY = "alchansia-layout-slots-v1";
 const CALCULATOR_STORAGE_KEY = "alchansia-calculator-v1";
 const MATERIAL_STORAGE_KEY = "alchansia-materials-v1";
@@ -621,6 +711,7 @@ const CAULDRON_SLOT_STORAGE_KEY = "alchansia-cauldron-slots-v1";
 const TIME_CALCULATOR_STORAGE_KEY = "alchansia-time-calculator-v1";
 const SKILL_TREE_STORAGE_KEY = "alchansia-skill-tree-v1";
 const SKILL_POINT_STORAGE_KEY = "alchansia-skill-points-v1";
+const FRIEND_PROFILE_PROXY_ENDPOINT = "https://alcanthia-farm-proxy.sh95-game.workers.dev/";
 const TIME_RELEVANT_SKILL_KEYS = {
   flameMastery: "불꽃 숙련",
 };
@@ -765,10 +856,10 @@ const MASTER_WITCH_TITLE_COMBOS = {
 };
 const CENTER_CELL = { col: 3, row: 3 };
 const BASE_BOUNDS = {
-  minCol: 0,
-  maxCol: 6,
-  minRow: 0,
-  maxRow: 6,
+  minCol: 1,
+  maxCol: 5,
+  minRow: 1,
+  maxRow: 5,
 };
 
 const state = {
@@ -777,6 +868,7 @@ const state = {
   plants: new Map(),
   desertTiles: new Set(),
   toxicTiles: new Set(),
+  fertileTiles: new Set(),
   scarecrowTiles: new Set(),
   galePotionActive: false,
   layoutSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
@@ -792,6 +884,8 @@ const state = {
   skillLevels: new Map(),
   activeSkillCategory: "",
   selectedSkillKey: "",
+  friendImportProfile: null,
+  friendImportSummary: null,
   cauldrons: Object.fromEntries(CAULDRON_TIERS.map((tier) => [tier.id, []])),
   recipeSelections: new Map(),
   hover: null,
@@ -857,12 +951,11 @@ let plannerAnalysisJobType = "";
 function createStartingCells() {
   const cells = new Set();
 
-  STARTING_ROWS.forEach((count, row) => {
-    const offset = row % 2 === 0 ? 0 : 1;
-    for (let col = 0; col < count; col += 1) {
-      cells.add(cellKey(col * 2 + offset, row));
+  for (let row = BASE_BOUNDS.minRow; row <= BASE_BOUNDS.maxRow; row += 1) {
+    for (let col = BASE_BOUNDS.minCol; col <= BASE_BOUNDS.maxCol; col += 1) {
+      cells.add(cellKey(col, row));
     }
-  });
+  }
 
   return cells;
 }
@@ -944,38 +1037,119 @@ function basePlannerCellConditions(key) {
   if (state.toxicTiles.has(key)) {
     conditions.push("toxic");
   }
+  if (state.fertileTiles.has(key)) {
+    conditions.push("fertile");
+  }
   return conditions;
 }
 
 function logicalPoint(col, row) {
   return {
-    x: (col + row) / 2,
-    y: (row - col) / 2,
+    x: col,
+    y: row,
   };
 }
 
 function currentLayoutPayload() {
   return {
+    layoutVersion: LAYOUT_VERSION,
     cells: [...state.cells],
     plants: [...state.plants.entries()]
       .map(([key, placement]) => [key, normalizePlantPlacement(placement)])
       .filter((entry) => entry[1]),
     desertTiles: [...state.desertTiles],
     toxicTiles: [...state.toxicTiles],
+    fertileTiles: [...state.fertileTiles],
     scarecrowTiles: [...state.scarecrowTiles],
     galePotionActive: state.galePotionActive,
+    boostPotionActive: state.boostPotionActive,
     selectedCropId: state.selectedCropId,
     selectedCropEnhancement: clampEnhancementLevel(state.selectedCropEnhancement),
   };
 }
 
+function migrateLegacyCellKey(key) {
+  const { col, row } = parseKey(key);
+  if (!Number.isFinite(col) || !Number.isFinite(row)) {
+    return null;
+  }
+  if ((col + row) % 2 !== 0) {
+    return key;
+  }
+
+  return cellKey((col - row) / 2 + CENTER_CELL.col, (col + row) / 2);
+}
+
+function isLegacyLayoutPayload(payload) {
+  if (!payload || payload.layoutVersion >= LAYOUT_VERSION) {
+    return false;
+  }
+
+  const cells = Array.isArray(payload.cells)
+    ? payload.cells.filter((value) => typeof value === "string")
+    : [];
+  if (!cells.length) {
+    return false;
+  }
+
+  return cells.every((key) => {
+    const { col, row } = parseKey(key);
+    return Number.isFinite(col) && Number.isFinite(row) && (col + row) % 2 === 0;
+  });
+}
+
+function migrateLegacyLayoutPayload(payload) {
+  if (!isLegacyLayoutPayload(payload)) {
+    return payload;
+  }
+
+  const migrateKeyArray = (values) =>
+    Array.isArray(values)
+      ? [...new Set(values
+          .filter((value) => typeof value === "string")
+          .map((value) => migrateLegacyCellKey(value))
+          .filter(Boolean))]
+      : [];
+
+  const migratePlants = (plants) =>
+    Array.isArray(plants)
+      ? plants
+          .map((entry) => {
+            if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string") {
+              return null;
+            }
+
+            const migratedKey = migrateLegacyCellKey(entry[0]);
+            return migratedKey ? [migratedKey, entry[1]] : null;
+          })
+          .filter(Boolean)
+      : [];
+
+  return {
+    ...payload,
+    layoutVersion: LAYOUT_VERSION,
+    cells: migrateKeyArray(payload.cells),
+    plants: migratePlants(payload.plants),
+    desertTiles: migrateKeyArray(payload.desertTiles),
+    toxicTiles: migrateKeyArray(
+      Array.isArray(payload.toxicTiles) ? payload.toxicTiles : payload.poisonTiles,
+    ),
+    poisonTiles: migrateKeyArray(
+      Array.isArray(payload.poisonTiles) ? payload.poisonTiles : payload.toxicTiles,
+    ),
+    fertileTiles: migrateKeyArray(payload.fertileTiles),
+    scarecrowTiles: migrateKeyArray(payload.scarecrowTiles),
+  };
+}
+
 function applyLayoutPayload(payload) {
-  const cells = Array.isArray(payload?.cells) && payload.cells.length
-    ? new Set(payload.cells.filter((value) => typeof value === "string"))
+  const normalizedPayload = migrateLegacyLayoutPayload(payload);
+  const cells = Array.isArray(normalizedPayload?.cells) && normalizedPayload.cells.length
+    ? new Set(normalizedPayload.cells.filter((value) => typeof value === "string"))
     : createStartingCells();
   const plants = new Map(
-    Array.isArray(payload?.plants)
-      ? payload.plants
+    Array.isArray(normalizedPayload?.plants)
+      ? normalizedPayload.plants
           .map((entry) => {
             if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string") {
               return null;
@@ -988,34 +1162,41 @@ function applyLayoutPayload(payload) {
       : [],
   );
   const desertTiles = new Set(
-    Array.isArray(payload?.desertTiles)
-      ? payload.desertTiles.filter((value) => typeof value === "string")
+    Array.isArray(normalizedPayload?.desertTiles)
+      ? normalizedPayload.desertTiles.filter((value) => typeof value === "string")
       : [],
   );
-  const toxicTileSource = Array.isArray(payload?.toxicTiles)
-    ? payload.toxicTiles
-    : Array.isArray(payload?.poisonTiles)
-      ? payload.poisonTiles
+  const toxicTileSource = Array.isArray(normalizedPayload?.toxicTiles)
+    ? normalizedPayload.toxicTiles
+    : Array.isArray(normalizedPayload?.poisonTiles)
+      ? normalizedPayload.poisonTiles
       : [];
   const toxicTiles = new Set(
     toxicTileSource.filter((value) => typeof value === "string"),
   );
+  const fertileTiles = new Set(
+    Array.isArray(normalizedPayload?.fertileTiles)
+      ? normalizedPayload.fertileTiles.filter((value) => typeof value === "string")
+      : [],
+  );
   const scarecrowTiles = new Set(
-    Array.isArray(payload?.scarecrowTiles)
-      ? payload.scarecrowTiles.filter((value) => typeof value === "string")
+    Array.isArray(normalizedPayload?.scarecrowTiles)
+      ? normalizedPayload.scarecrowTiles.filter((value) => typeof value === "string")
       : [],
   );
   state.cells = cells.size ? cells : createStartingCells();
   state.plants = new Map([...plants].filter(([key]) => state.cells.has(key)));
   state.desertTiles = new Set([...desertTiles].filter((key) => state.cells.has(key)));
   state.toxicTiles = new Set([...toxicTiles].filter((key) => state.cells.has(key)));
+  state.fertileTiles = new Set([...fertileTiles].filter((key) => state.cells.has(key)));
   state.scarecrowTiles = new Set([...scarecrowTiles].filter((key) => state.cells.has(key)));
-  state.galePotionActive = Boolean(payload?.galePotionActive);
+  state.galePotionActive = Boolean(normalizedPayload?.galePotionActive);
+  state.boostPotionActive = Boolean(normalizedPayload?.boostPotionActive);
 
-  if (cropById.has(payload?.selectedCropId)) {
-    state.selectedCropId = payload.selectedCropId;
+  if (cropById.has(normalizedPayload?.selectedCropId)) {
+    state.selectedCropId = normalizedPayload.selectedCropId;
   }
-  state.selectedCropEnhancement = clampEnhancementLevel(payload?.selectedCropEnhancement);
+  state.selectedCropEnhancement = clampEnhancementLevel(normalizedPayload?.selectedCropEnhancement);
 }
 
 function encodeLayoutPayload(payload) {
@@ -1034,6 +1215,276 @@ function decodeLayoutPayload(encoded) {
   const binary = atob(normalized + padding);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function remoteOrnamentIsScarecrow(ornament) {
+  const key = String(
+    ornament?.itemCode
+    ?? ornament?.id
+    ?? ornament?.itemKey
+    ?? "",
+  ).toLowerCase();
+  return key.includes("scarecrow");
+}
+
+function collectMappedFriendCells(profile) {
+  if (!Array.isArray(profile?.grid)) {
+    throw new Error("공개 밭 데이터에 grid 정보가 없습니다.");
+  }
+
+  const remoteCells = [];
+  profile.grid.forEach((row, rowIndex) => {
+    if (!Array.isArray(row)) {
+      return;
+    }
+    row.forEach((cell, colIndex) => {
+      if (cell) {
+        remoteCells.push({ row: rowIndex, col: colIndex, cell });
+      }
+    });
+  });
+
+  if (!remoteCells.length) {
+    throw new Error("공개 밭에 표시할 칸이 없습니다.");
+  }
+
+  const remoteCenterCol = Math.round((Math.min(...remoteCells.map((entry) => entry.col)) + Math.max(...remoteCells.map((entry) => entry.col))) / 2);
+  const remoteCenterRow = Math.round((Math.min(...remoteCells.map((entry) => entry.row)) + Math.max(...remoteCells.map((entry) => entry.row))) / 2);
+
+  return remoteCells.map(({ row, col, cell }) => {
+    const relativeCol = col - remoteCenterCol;
+    const relativeRow = row - remoteCenterRow;
+    const localCol = CENTER_CELL.col - relativeRow;
+    const localRow = CENTER_CELL.row + relativeCol;
+    const cropId = plantIdToCropId.get(cell?.plant?.id) ?? "";
+    return {
+      cell,
+      key: cellKey(localCol, localRow),
+      col: localCol,
+      row: localRow,
+      cropId,
+      conditions: Array.isArray(cell?.conditions) ? cell.conditions : [],
+      hasScarecrow: remoteOrnamentIsScarecrow(cell?.ornament),
+    };
+  });
+}
+
+function layoutPayloadFromFriendProfile(profile) {
+  const mappedCells = collectMappedFriendCells(profile);
+
+  const cells = new Set();
+  const plants = [];
+  const desertTiles = new Set();
+  const toxicTiles = new Set();
+  const fertileTiles = new Set();
+  const scarecrowTiles = new Set();
+
+  mappedCells.forEach((entry) => {
+    cells.add(entry.key);
+
+    if (entry.conditions.includes("arid")) {
+      desertTiles.add(entry.key);
+    }
+    if (entry.conditions.includes("toxic")) {
+      toxicTiles.add(entry.key);
+    }
+    if (entry.conditions.includes("fertile")) {
+      fertileTiles.add(entry.key);
+    }
+
+    if (entry.hasScarecrow) {
+      scarecrowTiles.add(entry.key);
+    }
+
+    if (entry.cropId) {
+      plants.push([
+        entry.key,
+        {
+          cropId: entry.cropId,
+          enhancement: clampEnhancementLevel(entry.cell?.plant?.enhancement),
+        },
+      ]);
+    }
+  });
+
+  const activeEffects = Array.isArray(profile?.effects) ? profile.effects : [];
+  return {
+    layoutVersion: LAYOUT_VERSION,
+    cells: [...cells],
+    plants,
+    desertTiles: [...desertTiles],
+    toxicTiles: [...toxicTiles],
+    fertileTiles: [...fertileTiles],
+    scarecrowTiles: [...scarecrowTiles].filter((key) => !plants.some(([plantKey]) => plantKey === key)),
+    galePotionActive: activeEffects.some((effect) => effect?.itemCode === "gale_potion"),
+    boostPotionActive: activeEffects.some((effect) => effect?.itemCode === "red_essence"),
+    selectedCropId: state.selectedCropId,
+    selectedCropEnhancement: selectedCropEnhancementLevel(),
+  };
+}
+
+function applyFriendSkillProfile(profile) {
+  const spellLevels = profile?.spellLevels && typeof profile.spellLevels === "object"
+    ? profile.spellLevels
+    : {};
+  state.skillLevels = new Map(
+    Object.entries(spellLevels)
+      .filter(([, level]) => Number(level) > 0)
+      .map(([key, level]) => [key, Number(level)]),
+  );
+  state.selectedSkillKey = "";
+  if (!state.activeSkillCategory) {
+    state.activeSkillCategory = skillCategories()[0] ?? "";
+  }
+}
+
+function friendSkillLevelsMap(profile) {
+  const spellLevels = profile?.spellLevels && typeof profile.spellLevels === "object"
+    ? profile.spellLevels
+    : {};
+  return new Map(
+    Object.entries(spellLevels)
+      .filter(([, level]) => Number(level) > 0)
+      .map(([key, level]) => [key, Number(level)]),
+  );
+}
+
+function summarizeFriendProfile(profile, nickname) {
+  const grid = Array.isArray(profile?.grid) ? profile.grid : [];
+  let totalCells = 0;
+  let plantCount = 0;
+  let fertileCount = 0;
+  let scarecrowCount = 0;
+  let desertCount = 0;
+  let toxicCount = 0;
+  const cropCounts = new Map();
+
+  grid.forEach((row) => {
+    if (!Array.isArray(row)) {
+      return;
+    }
+    row.forEach((cell) => {
+      if (!cell) {
+        return;
+      }
+      totalCells += 1;
+      const conditions = Array.isArray(cell.conditions) ? cell.conditions : [];
+      if (conditions.includes("fertile")) {
+        fertileCount += 1;
+      }
+      if (conditions.includes("arid")) {
+        desertCount += 1;
+      }
+      if (conditions.includes("toxic")) {
+        toxicCount += 1;
+      }
+      if (remoteOrnamentIsScarecrow(cell.ornament)) {
+        scarecrowCount += 1;
+      }
+      const cropId = plantIdToCropId.get(cell?.plant?.id);
+      if (cropId) {
+        plantCount += 1;
+        cropCounts.set(cropId, (cropCounts.get(cropId) ?? 0) + 1);
+      }
+    });
+  });
+
+  const spellLevels = profile?.spellLevels && typeof profile.spellLevels === "object"
+    ? profile.spellLevels
+    : {};
+  const learnedSkills = Object.entries(spellLevels)
+    .filter(([, level]) => Number(level) > 0)
+    .map(([key, level]) => ({ key, level: Number(level) }));
+  const topCrops = [...cropCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([cropId, count]) => `${cropById.get(cropId)?.name ?? cropId} ${count}개`);
+  const production = Array.isArray(profile?.raw?.production) ? profile.raw.production : [];
+  const topProduction = production
+    .slice()
+    .sort((a, b) => (Number(b?.perHour) || 0) - (Number(a?.perHour) || 0))
+    .slice(0, 3)
+    .map((entry) => `${entry.itemKey ?? entry.itemCode ?? "-"} ${formatNumber(Number(entry.perHour) || 0, 1)}/h`);
+  const playerLevel = Number.isFinite(Number(profile?.raw?.exp))
+    ? simulateLevelProgress(1, 0, Number(profile.raw.exp)).level
+    : 0;
+
+  return {
+    nickname: profile?.nickname ?? nickname,
+    theme: profile?.activeTheme ?? "default",
+    playerLevel,
+    totalCells,
+    plantCount,
+    fertileCount,
+    scarecrowCount,
+    desertCount,
+    toxicCount,
+    learnedSkillCount: learnedSkills.length,
+    learnedSkillPoints: learnedSkills.reduce((sum, entry) => sum + entry.level, 0),
+    disabledSpellCount: Array.isArray(profile?.disabledSpells) ? profile.disabledSpells.length : 0,
+    effectCount: Array.isArray(profile?.effects) ? profile.effects.length : 0,
+    topCrops,
+    topProduction,
+  };
+}
+
+async function fetchFriendProfileByNickname(nickname) {
+  const trimmedNickname = String(nickname ?? "").trim();
+  if (!trimmedNickname) {
+    throw new Error("닉네임을 입력해 주세요.");
+  }
+
+  const endpoint = new URL(FRIEND_PROFILE_PROXY_ENDPOINT);
+  endpoint.searchParams.set("nickname", trimmedNickname);
+
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.ok || !payload?.profile) {
+    const message = typeof payload?.error === "string"
+      ? payload.error
+      : `공개 밭 조회 실패 (${response.status})`;
+    throw new Error(message);
+  }
+  const profile = payload.profile;
+  if (!Array.isArray(profile.grid)) {
+    const message = typeof profile?.raw?.error === "string"
+      ? profile.raw.error
+      : "공개 밭 데이터를 읽지 못했습니다.";
+    throw new Error(message);
+  }
+
+  return {
+    profile,
+    summary: summarizeFriendProfile(profile, payload?.nickname ?? trimmedNickname),
+  };
+}
+
+function applyFriendLayoutProfile(profile) {
+  applyLayoutPayload(layoutPayloadFromFriendProfile(profile));
+  saveLayoutToStorage();
+  renderPalette();
+  renderBoostPotionButton();
+  centerView();
+  draw();
+}
+
+function refreshAfterFriendSkillImport() {
+  saveSkillTreeToStorage();
+  renderSkillTree();
+  renderSkillPointCalculator();
+  renderRecipeCalculator();
+  renderMaterialCalculator();
+  draw();
+}
+
+function applyFriendAllProfile(profile) {
+  applyFriendLayoutProfile(profile);
+  applyFriendSkillProfile(profile);
+  refreshAfterFriendSkillImport();
 }
 
 function currentShareUrl() {
@@ -1373,6 +1824,170 @@ function closeSlotModal() {
   slotModalBackdrop.hidden = true;
 }
 
+function setFriendImportStatus(message, isError = false) {
+  friendImportStatus.textContent = message;
+  friendImportStatus.classList.toggle("error", isError);
+}
+
+function summaryRowsMarkup(rows) {
+  return rows.map((row) => `<p>${row}</p>`).join("");
+}
+
+function friendPreviewDataUrlFromCurrentCanvas() {
+  const pixelRatio = canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const key of state.cells) {
+    const { col, row } = parseKey(key);
+    const points = polygonForCell(col, row).map((point) => worldToScreen(point.x, point.y));
+    points.forEach((point) => {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    });
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+    return canvas.toDataURL("image/png");
+  }
+
+  const padding = 20;
+  const sourceX = Math.max(0, Math.floor((minX - padding) * pixelRatio));
+  const sourceY = Math.max(0, Math.floor((minY - padding) * pixelRatio));
+  const sourceWidth = Math.min(
+    canvas.width - sourceX,
+    Math.ceil((maxX - minX + padding * 2) * pixelRatio),
+  );
+  const sourceHeight = Math.min(
+    canvas.height - sourceY,
+    Math.ceil((maxY - minY + padding * 2) * pixelRatio),
+  );
+
+  const previewCanvas = document.createElement("canvas");
+  previewCanvas.width = Math.max(1, sourceWidth);
+  previewCanvas.height = Math.max(1, sourceHeight);
+  const previewCtx = previewCanvas.getContext("2d");
+  previewCtx.drawImage(
+    canvas,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    sourceWidth,
+    sourceHeight,
+  );
+  return previewCanvas.toDataURL("image/png");
+}
+
+function renderFriendFieldPreview(profile) {
+  const previewPayload = layoutPayloadFromFriendProfile(profile);
+  const snapshot = {
+    cells: new Set(state.cells),
+    addSlots: state.addSlots.map((slot) => ({ ...slot })),
+    plants: new Map(state.plants),
+    desertTiles: new Set(state.desertTiles),
+    toxicTiles: new Set(state.toxicTiles),
+    fertileTiles: new Set(state.fertileTiles),
+    scarecrowTiles: new Set(state.scarecrowTiles),
+    galePotionActive: state.galePotionActive,
+    boostPotionActive: state.boostPotionActive,
+    selectedCropId: state.selectedCropId,
+    selectedCropEnhancement: state.selectedCropEnhancement,
+    skillLevels: new Map(state.skillLevels),
+    activeSkillCategory: state.activeSkillCategory,
+    selectedSkillKey: state.selectedSkillKey,
+    hover: state.hover ? { ...state.hover } : null,
+    hoverPoint: state.hoverPoint ? { ...state.hoverPoint } : null,
+    view: { ...state.view },
+  };
+
+  try {
+    applyLayoutPayload(previewPayload);
+    state.skillLevels = friendSkillLevelsMap(profile);
+    state.hover = null;
+    state.hoverPoint = null;
+    centerView();
+    const previewDataUrl = friendPreviewDataUrlFromCurrentCanvas();
+    friendFieldPreview.innerHTML = `<img class="friend-preview-image" src="${previewDataUrl}" alt="밭 미리보기" />`;
+  } finally {
+    state.cells = snapshot.cells;
+    state.addSlots = snapshot.addSlots;
+    state.plants = snapshot.plants;
+    state.desertTiles = snapshot.desertTiles;
+    state.toxicTiles = snapshot.toxicTiles;
+    state.fertileTiles = snapshot.fertileTiles;
+    state.scarecrowTiles = snapshot.scarecrowTiles;
+    state.galePotionActive = snapshot.galePotionActive;
+    state.boostPotionActive = snapshot.boostPotionActive;
+    state.selectedCropId = snapshot.selectedCropId;
+    state.selectedCropEnhancement = snapshot.selectedCropEnhancement;
+    state.skillLevels = snapshot.skillLevels;
+    state.activeSkillCategory = snapshot.activeSkillCategory;
+    state.selectedSkillKey = snapshot.selectedSkillKey;
+    state.hover = snapshot.hover;
+    state.hoverPoint = snapshot.hoverPoint;
+    state.view = snapshot.view;
+    draw();
+  }
+}
+
+function renderFriendImportPreview() {
+  const summary = state.friendImportSummary;
+  const profile = state.friendImportProfile;
+  if (!summary || !profile) {
+    friendImportResult.hidden = true;
+    friendApplyFieldButton.disabled = true;
+    friendApplySkillsButton.disabled = true;
+    friendApplyAllButton.disabled = true;
+    friendResultTheme.hidden = false;
+    friendResultOverview.hidden = false;
+    friendFieldSummary.closest(".friend-import-info-card").hidden = false;
+    friendOtherSummary.closest(".friend-import-info-card").hidden = false;
+    friendFieldPreview.innerHTML = "";
+    return;
+  }
+
+  friendImportResult.hidden = false;
+  friendApplyFieldButton.disabled = false;
+  friendApplySkillsButton.disabled = false;
+  friendApplyAllButton.disabled = false;
+  renderFriendFieldPreview(profile);
+  friendResultNickname.textContent = summary.nickname;
+  friendResultTheme.hidden = true;
+  friendResultOverview.hidden = true;
+  friendFieldSummary.closest(".friend-import-info-card").hidden = true;
+  friendOtherSummary.closest(".friend-import-info-card").hidden = true;
+  friendSkillSummary.closest(".friend-import-info-card").hidden = false;
+  friendSkillSummary.innerHTML = summaryRowsMarkup([
+    `투자 ${summary.learnedSkillPoints}pt / Lv ${summary.playerLevel || "-"}`,
+  ]);
+}
+
+function resetFriendImportPreview() {
+  state.friendImportProfile = null;
+  state.friendImportSummary = null;
+  renderFriendImportPreview();
+}
+
+function openFriendImportDialog() {
+  resetFriendImportPreview();
+  setFriendImportStatus("닉네임을 입력한 뒤 조회를 눌러 주세요.");
+  friendImportDialog.hidden = false;
+  friendImportBackdrop.hidden = false;
+  friendNicknameInput.focus();
+}
+
+function closeFriendImportDialog() {
+  friendImportDialog.hidden = true;
+  friendImportBackdrop.hidden = true;
+}
+
 function renderLayoutSlots() {
   const config = activeSlotConfig();
   const title = slotPanel.querySelector(".slot-panel-header h3");
@@ -1383,7 +1998,6 @@ function renderLayoutSlots() {
   if (description) {
     description.textContent = "최대 10개 저장";
   }
-
   slotList.innerHTML = "";
 
   config.slots.forEach((slot, index) => {
@@ -3723,12 +4337,12 @@ function expansionCostText(enhancement) {
   return `${enhancement}강 마력결정 1개 + ${enhancement}강 각인석 1개`;
 }
 
-function getDiagonalNeighbors(col, row) {
+function getAdjacentNeighbors(col, row) {
   return [
-    { col: col - 1, row: row - 1 },
-    { col: col + 1, row: row - 1 },
-    { col: col - 1, row: row + 1 },
-    { col: col + 1, row: row + 1 },
+    { col: col, row: row - 1 },
+    { col: col + 1, row },
+    { col: col, row: row + 1 },
+    { col: col - 1, row },
   ];
 }
 
@@ -3738,7 +4352,7 @@ function collectAddSlots() {
   for (const key of state.cells) {
     const { col, row } = parseKey(key);
 
-    for (const neighbor of getDiagonalNeighbors(col, row)) {
+    for (const neighbor of getAdjacentNeighbors(col, row)) {
       const neighborKey = cellKey(neighbor.col, neighbor.row);
       if (state.cells.has(neighborKey) || slots.has(neighborKey)) {
         continue;
@@ -3752,20 +4366,35 @@ function collectAddSlots() {
 }
 
 function gridToPixel(col, row) {
-  return {
-    x: col * HALF_W,
-    y: row * HALF_H,
-  };
+  return projectRenderPoint(col * CELL_SIZE, row * CELL_SIZE);
 }
 
 function polygonForCell(col, row) {
   const center = gridToPixel(col, row);
-  return [
-    { x: center.x, y: center.y - HALF_H },
-    { x: center.x + HALF_W, y: center.y },
-    { x: center.x, y: center.y + HALF_H },
-    { x: center.x - HALF_W, y: center.y },
+  const offsets = [
+    { x: -HALF_W, y: -HALF_H },
+    { x: HALF_W, y: -HALF_H },
+    { x: HALF_W, y: HALF_H },
+    { x: -HALF_W, y: HALF_H },
   ];
+  return [
+    ...offsets.map((offset) => {
+      const projectedOffset = projectRenderPoint(offset.x, offset.y);
+      return {
+        x: center.x + projectedOffset.x,
+        y: center.y + projectedOffset.y,
+      };
+    }),
+  ];
+}
+
+function projectRenderPoint(x, y) {
+  const rotatedX = x * RENDER_COS + y * RENDER_SIN;
+  const rotatedY = -x * RENDER_SIN + y * RENDER_COS;
+  return {
+    x: rotatedX,
+    y: rotatedY * RENDER_VERTICAL_SCALE,
+  };
 }
 
 function drawDiamond(points, options) {
@@ -3789,20 +4418,36 @@ function getCellBounds() {
   const cells = [...state.cells].map(parseKey);
   const cols = cells.map(({ col }) => col);
   const rows = cells.map(({ row }) => row);
-  const minCol = Math.min(...cols);
-  const maxCol = Math.max(...cols);
-  const minRow = Math.min(...rows);
-  const maxRow = Math.max(...rows);
+  const minCol = Math.min(...cols) - GRID_PAD;
+  const maxCol = Math.max(...cols) + GRID_PAD;
+  const minRow = Math.min(...rows) - GRID_PAD;
+  const maxRow = Math.max(...rows) + GRID_PAD;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      const points = polygonForCell(col, row);
+      points.forEach((point) => {
+        minX = Math.min(minX, point.x);
+        maxX = Math.max(maxX, point.x);
+        minY = Math.min(minY, point.y);
+        maxY = Math.max(maxY, point.y);
+      });
+    }
+  }
 
   return {
-    minX: (minCol - GRID_PAD) * HALF_W - HALF_W,
-    maxX: (maxCol + GRID_PAD) * HALF_W + HALF_W,
-    minY: (minRow - GRID_PAD) * HALF_H - HALF_H,
-    maxY: (maxRow + GRID_PAD) * HALF_H + HALF_H,
-    minCol: minCol - GRID_PAD,
-    maxCol: maxCol + GRID_PAD,
-    minRow: minRow - GRID_PAD,
-    maxRow: maxRow + GRID_PAD,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    minCol,
+    maxCol,
+    minRow,
+    maxRow,
   };
 }
 
@@ -3862,6 +4507,7 @@ function plannerSimulationCacheKey() {
     plants: [...state.plants.entries()].sort((a, b) => a[0].localeCompare(b[0])),
     desertTiles: [...state.desertTiles].sort(),
     toxicTiles: [...state.toxicTiles].sort(),
+    fertileTiles: [...state.fertileTiles].sort(),
     scarecrowTiles: [...state.scarecrowTiles].sort(),
     galePotionActive: state.galePotionActive,
     boostPotionActive: state.boostPotionActive,
@@ -3902,7 +4548,7 @@ function plannerFieldEnhancement(col, row) {
   const point = logicalPoint(col, row);
   const center = logicalPoint(CENTER_CELL.col, CENTER_CELL.row);
   const distance = Math.abs(point.x - center.x) + Math.abs(point.y - center.y);
-  return Math.max(0, distance - 3);
+  return Math.max(0, distance - 4);
 }
 
 function plannerCompoundedValue(base, level, count) {
@@ -3976,10 +4622,10 @@ function buildPlannerAnalysis() {
   const cells = new Map();
   const cropCounts = new Map(CROPS.map((crop) => [crop.id, 0]));
   const cardinalDeltas = [
-    { col: -1, row: -1 },
-    { col: 1, row: -1 },
-    { col: -1, row: 1 },
-    { col: 1, row: 1 },
+    { col: 0, row: -1 },
+    { col: 1, row: 0 },
+    { col: 0, row: 1 },
+    { col: -1, row: 0 },
   ];
 
   for (const key of state.cells) {
@@ -4026,7 +4672,7 @@ function buildPlannerAnalysis() {
   }
 
   const orthogonalNeighborKeys = (cell) =>
-    getDiagonalNeighbors(cell.col, cell.row)
+    getAdjacentNeighbors(cell.col, cell.row)
       .map(({ col, row }) => cellKey(col, row))
       .filter((key) => cells.has(key));
   const hasAdjacentScarecrow = (cell) =>
@@ -4369,6 +5015,7 @@ function buildPlannerAnalysis() {
     effects.set(cell.key, {
       watered: cell.conditions.includes("humid") ? 1 : 0,
       toxic: cell.conditions.includes("toxic") ? 1 : 0,
+      fertile: cell.conditions.includes("fertile") ? 1 : 0,
       poisoned: cell.conditions.includes("poisonous") || cell.plant?.conditions.includes("poisoned") ? 1 : 0,
       sunBuff: cell.conditions.includes("sunlit") ? 1 : 0,
       scarecrow: state.scarecrowTiles.has(cell.key) ? 1 : 0,
@@ -4471,10 +5118,10 @@ function buildEffectMap() {
   const skillLevels = plannerSkillLevels();
   const cells = new Map();
   const cardinalDeltas = [
-    { col: -1, row: -1 },
-    { col: 1, row: -1 },
-    { col: -1, row: 1 },
-    { col: 1, row: 1 },
+    { col: 0, row: -1 },
+    { col: 1, row: 0 },
+    { col: 0, row: 1 },
+    { col: -1, row: 0 },
   ];
 
   for (const keyName of state.cells) {
@@ -4508,7 +5155,7 @@ function buildEffectMap() {
   }
 
   const orthogonalNeighborKeys = (cell) =>
-    getDiagonalNeighbors(cell.col, cell.row)
+    getAdjacentNeighbors(cell.col, cell.row)
       .map(({ col, row }) => cellKey(col, row))
       .filter((neighborKey) => cells.has(neighborKey));
 
@@ -4532,6 +5179,7 @@ function buildEffectMap() {
     effects.set(cell.key, {
       watered: 0,
       toxic: cell.conditions.includes("toxic") ? 1 : 0,
+      fertile: cell.conditions.includes("fertile") ? 1 : 0,
       poisoned: 0,
       sunBuff: 0,
       scarecrow: state.scarecrowTiles.has(cell.key) ? 1 : 0,
@@ -4727,6 +5375,16 @@ function drawEffectOverlay(points, effect) {
       stripe: "#9b69e6",
       lineWidth: 1.6,
       stripeSpacing: 10,
+    });
+  }
+
+  if (effect.fertile > 0) {
+    drawStripedDiamond(points, {
+      fill: "rgba(201, 240, 154, 0.34)",
+      stroke: "#6f9c32",
+      stripe: "#a5cd5f",
+      lineWidth: 1.3,
+      stripeSpacing: 12,
     });
   }
 
@@ -4933,17 +5591,6 @@ function drawScarecrow(col, row, effect, isHovered, deferredTextDraws = []) {
 
   ctx.restore();
 
-  deferredTextDraws.push(() => {
-    drawOverlayLabel({
-      text: "허",
-      x: center.x,
-      y: center.y + 25,
-      font: '700 10px "Malgun Gothic", sans-serif',
-      fillStyle: "#7e4c1f",
-      strokeStyle: "rgba(255, 246, 223, 0.92)",
-      lineWidth: 2.4,
-    });
-  });
 }
 
 function drawPlant(col, row, crop, enhancement, effect, isHovered, deferredTextDraws = []) {
@@ -4980,7 +5627,7 @@ function drawPlant(col, row, crop, enhancement, effect, isHovered, deferredTextD
   ctx.restore();
 
   if (hasCropImage) {
-    const imageSize = radius * 2.15;
+    const imageSize = radius * 1.72;
     ctx.save();
     ctx.globalAlpha = effect.dead ? 0.58 : 1;
     ctx.drawImage(
@@ -5039,25 +5686,8 @@ function drawPlant(col, row, crop, enhancement, effect, isHovered, deferredTextD
   }
 
   if (effect.scarecrowProtected > 0) {
-    ctx.save();
-    ctx.fillStyle = "rgba(126, 76, 31, 0.96)";
-    ctx.beginPath();
-    ctx.roundRect(center.x - 11, center.y + 8, 22, 16, 6);
-    ctx.fill();
-    ctx.restore();
     deferredTextDraws.push(() => {
-      drawOverlayLabel({
-        text: "항마",
-        x: center.x,
-        y: center.y + 16,
-        font: '700 10px "Malgun Gothic", sans-serif',
-        fillStyle: "#fff6df",
-        strokeStyle: "rgba(76, 40, 12, 0.98)",
-        lineWidth: 3,
-      });
-    });
-    deferredTextDraws.push(() => {
-      drawShieldBadge(center.x, center.y + 16);
+      drawShieldBadge(center.x, center.y + 12);
     });
   }
 
@@ -5085,18 +5715,18 @@ function drawPlant(col, row, crop, enhancement, effect, isHovered, deferredTextD
     ctx.save();
     ctx.fillStyle = effect.windSpawned ? "rgba(28, 114, 103, 0.94)" : "rgba(69, 40, 16, 0.92)";
     ctx.beginPath();
-    ctx.roundRect(center.x + 6, center.y - 24, 22, 16, 6);
+    ctx.roundRect(center.x + 10, center.y - 5, 13, 10, 4);
     ctx.fill();
     ctx.restore();
     deferredTextDraws.push(() => {
       drawOverlayLabel({
         text: `+${enhancement}`,
-        x: center.x + 17,
-        y: center.y - 16,
-        font: '700 10px "Segoe UI", sans-serif',
+        x: center.x + 16.5,
+        y: center.y + 0.5,
+        font: '700 6px "Segoe UI", sans-serif',
         fillStyle: effect.windSpawned ? "#f4fffb" : "#fff6df",
         strokeStyle: effect.windSpawned ? "rgba(16, 79, 72, 0.96)" : "rgba(44, 24, 12, 0.96)",
-        lineWidth: 2.8,
+        lineWidth: 1.8,
       });
     });
   }
@@ -5130,35 +5760,7 @@ function drawPlant(col, row, crop, enhancement, effect, isHovered, deferredTextD
     });
   }
 
-  if (effect.watered > 0 || effect.toxic > 0 || effect.poisoned > 0 || effect.sunBuff > 0) {
-    const markers = [];
-    if (effect.watered > 0) markers.push({ color: "#4ea7d8", text: `W${effect.watered}` });
-    if (effect.toxic > 0) markers.push({ color: "#8e5fce", text: `T${effect.toxic}` });
-    if (effect.poisoned > 0) markers.push({ color: "#8f6ab4", text: `P${effect.poisoned}` });
-    if (effect.sunBuff > 0) markers.push({ color: "#f0c445", text: `S${effect.sunBuff}` });
-
-    markers.forEach((marker, index) => {
-      const x = center.x - 14 + index * 18;
-      const y = center.y + 24;
-      ctx.save();
-      ctx.fillStyle = marker.color;
-      ctx.beginPath();
-      ctx.roundRect(x - 7, y - 7, 16, 14, 5);
-      ctx.fill();
-      ctx.restore();
-      deferredTextDraws.push(() => {
-        drawOverlayLabel({
-          text: marker.text,
-          x: x + 1,
-          y: y + 1,
-          font: '700 9px "Segoe UI", sans-serif',
-          fillStyle: "#fffaf2",
-          strokeStyle: "rgba(44, 24, 12, 0.96)",
-          lineWidth: 2.4,
-        });
-      });
-    });
-  }
+  // Hidden by request: per-cell effect count markers (W/T/P/S).
 }
 
 function getHoveredKey(kind) {
@@ -5215,10 +5817,11 @@ function drawOverlayLabel({
 function drawShieldBadge(x, y) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(0.55, 0.55);
 
   ctx.beginPath();
   ctx.roundRect(-11, -8, 22, 16, 6);
-  ctx.fillStyle = "rgba(126, 76, 31, 0.96)";
+  ctx.fillStyle = "rgba(23, 112, 123, 0.98)";
   ctx.fill();
 
   ctx.beginPath();
@@ -5229,7 +5832,7 @@ function drawShieldBadge(x, y) {
   ctx.quadraticCurveTo(-4.3, 6.4, -5, 2.5);
   ctx.lineTo(-5.5, -2.4);
   ctx.closePath();
-  ctx.fillStyle = "#fff6df";
+  ctx.fillStyle = "#effffd";
   ctx.fill();
 
   ctx.beginPath();
@@ -5240,7 +5843,7 @@ function drawShieldBadge(x, y) {
   ctx.quadraticCurveTo(-2.3, 4.2, -2.8, 1.5);
   ctx.lineTo(-3.1, -1.7);
   ctx.closePath();
-  ctx.fillStyle = "rgba(126, 76, 31, 0.96)";
+  ctx.fillStyle = "rgba(35, 152, 167, 0.98)";
   ctx.fill();
 
   ctx.restore();
@@ -5289,12 +5892,6 @@ function draw(options = {}) {
     drawEffectOverlay(points, effect);
 
     const center = gridToPixel(col, row);
-    ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.38)";
-    ctx.beginPath();
-    ctx.ellipse(center.x - 8, center.y - 10, 16, 9, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
 
     if (isDesert) {
       ctx.save();
@@ -5329,7 +5926,7 @@ function draw(options = {}) {
       drawWindPreview(col, row, effect);
     }
     if (!placement && !hasScarecrow && effect.scarecrowProtected > 0) {
-      queueScarecrowProtectionBadge(deferredTextDraws, center.x, center.y + 16);
+      queueScarecrowProtectionBadge(deferredTextDraws, center.x, center.y + 12);
     }
   }
 
@@ -5478,18 +6075,40 @@ function pointerPosition(event) {
 
 function centerView() {
   state.addSlots = collectAddSlots();
-  const bounds = getCellBounds();
-  const worldWidth = bounds.maxX - bounds.minX;
-  const worldHeight = bounds.maxY - bounds.minY;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const key of state.cells) {
+    const { col, row } = parseKey(key);
+    const points = polygonForCell(col, row);
+    points.forEach((point) => {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    });
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+    draw();
+    return;
+  }
+
+  const paddingX = CELL_SIZE * 0.9;
+  const paddingY = CELL_SIZE * 0.7;
+  const worldWidth = (maxX - minX) + paddingX * 2;
+  const worldHeight = (maxY - minY) + paddingY * 2;
   const scaleX = canvas.clientWidth / Math.max(worldWidth, 1);
   const scaleY = canvas.clientHeight / Math.max(worldHeight, 1);
   state.view.scale = Math.max(
     MIN_SCALE,
-    Math.min(MAX_SCALE, Math.min(scaleX, scaleY) * 0.88),
+    Math.min(MAX_SCALE, Math.min(scaleX, scaleY)),
   );
 
-  const worldCenterX = (bounds.minX + bounds.maxX) / 2;
-  const worldCenterY = (bounds.minY + bounds.maxY) / 2;
+  const worldCenterX = (minX + maxX) / 2;
+  const worldCenterY = (minY + maxY) / 2;
   state.view.offsetX = canvas.clientWidth / 2 - worldCenterX * state.view.scale;
   state.view.offsetY = canvas.clientHeight / 2 - worldCenterY * state.view.scale;
   draw();
@@ -5697,10 +6316,6 @@ function expandToNextRing() {
 
   for (let row = minRow; row <= maxRow; row += 1) {
     for (let col = minCol; col <= maxCol; col += 1) {
-      if ((col + row) % 2 !== 0) {
-        continue;
-      }
-
       const key = cellKey(col, row);
       if (!state.cells.has(key)) {
         targets.push({ col, row });
@@ -5774,6 +6389,7 @@ function applyClick(point) {
     state.plants.delete(cell.key);
     state.desertTiles.delete(cell.key);
     state.toxicTiles.delete(cell.key);
+    state.fertileTiles.delete(cell.key);
     state.scarecrowTiles.delete(cell.key);
     if (state.cells.size === 0) {
       state.cells = createStartingCells();
@@ -5980,6 +6596,8 @@ canvas.addEventListener("contextmenu", (event) => {
   state.plants.delete(cell.key);
   state.desertTiles.delete(cell.key);
   state.toxicTiles.delete(cell.key);
+  state.fertileTiles.delete(cell.key);
+  state.scarecrowTiles.delete(cell.key);
 
   for (const [key] of state.plants) {
     if (!state.cells.has(key)) {
@@ -6001,8 +6619,10 @@ clearCropsButton.addEventListener("click", () => {
   state.plants.clear();
   state.desertTiles.clear();
   state.toxicTiles.clear();
+  state.fertileTiles.clear();
   state.scarecrowTiles.clear();
   state.galePotionActive = false;
+  state.boostPotionActive = false;
   saveLayoutToStorage();
   draw();
 });
@@ -6021,11 +6641,76 @@ openCauldronSlotsButton.addEventListener("click", () => {
   openSlotModal("cauldron");
 });
 
+openFriendImportButton.addEventListener("click", () => {
+  openFriendImportDialog();
+});
+
+friendImportButton?.addEventListener("click", async () => {
+  const nickname = friendNicknameInput?.value ?? "";
+  friendImportButton.disabled = true;
+  setFriendImportStatus("조회 중...");
+  resetFriendImportPreview();
+  try {
+    const result = await fetchFriendProfileByNickname(nickname);
+    state.friendImportProfile = result.profile;
+    state.friendImportSummary = result.summary;
+    renderFriendImportPreview();
+    setFriendImportStatus(`${result.summary.nickname} 조회가 완료되었습니다.`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "공개 밭을 불러오지 못했습니다.";
+    setFriendImportStatus(message, true);
+  } finally {
+    friendImportButton.disabled = false;
+  }
+});
+
+friendNicknameInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    friendImportButton?.click();
+  }
+});
+
+friendApplyFieldButton?.addEventListener("click", () => {
+  if (!state.friendImportProfile || !state.friendImportSummary) {
+    return;
+  }
+  applyFriendLayoutProfile(state.friendImportProfile);
+  closeFriendImportDialog();
+  showCopyFeedback(`${state.friendImportSummary.nickname} 밭을 불러왔습니다.`);
+});
+
+friendApplySkillsButton?.addEventListener("click", () => {
+  if (!state.friendImportProfile || !state.friendImportSummary) {
+    return;
+  }
+  applyFriendSkillProfile(state.friendImportProfile);
+  refreshAfterFriendSkillImport();
+  closeFriendImportDialog();
+  showCopyFeedback(`${state.friendImportSummary.nickname} 스킬을 불러왔습니다.`);
+});
+
+friendApplyAllButton?.addEventListener("click", () => {
+  if (!state.friendImportProfile || !state.friendImportSummary) {
+    return;
+  }
+  applyFriendAllProfile(state.friendImportProfile);
+  closeFriendImportDialog();
+  showCopyFeedback(`${state.friendImportSummary.nickname} 밭과 스킬을 모두 불러왔습니다.`);
+});
+
 slotModalBackdrop.addEventListener("click", closeSlotModal);
+friendImportBackdrop.addEventListener("click", closeFriendImportDialog);
 
 slotPanel.addEventListener("click", (event) => {
   if (event.target.dataset.action === "close-slot-dialog") {
     closeSlotModal();
+  }
+});
+
+friendImportDialog.addEventListener("click", (event) => {
+  if (event.target.dataset.action === "close-friend-dialog") {
+    closeFriendImportDialog();
   }
 });
 
@@ -6235,8 +6920,10 @@ resetButton.addEventListener("click", () => {
   state.plants.clear();
   state.desertTiles.clear();
   state.toxicTiles.clear();
+  state.fertileTiles.clear();
   state.scarecrowTiles.clear();
   state.galePotionActive = false;
+  state.boostPotionActive = false;
   state.hover = null;
   state.hoverPoint = null;
   saveLayoutToStorage();
@@ -6266,9 +6953,11 @@ window.render_game_to_text = () =>
       .filter(Boolean),
     desertTiles: [...state.desertTiles].map(parseKey),
     toxicTiles: [...state.toxicTiles].map(parseKey),
+    fertileTiles: [...state.fertileTiles].map(parseKey),
     poisonTiles: [...state.toxicTiles].map(parseKey),
     scarecrowTiles: [...state.scarecrowTiles].map(parseKey),
     galePotionActive: state.galePotionActive,
+    boostPotionActive: state.boostPotionActive,
     expandableSlots: state.addSlots,
     skillCategory: state.activeSkillCategory,
     skillPointsSpent: skillPointTotals(),
@@ -6297,6 +6986,7 @@ window.__planner_debug = {
       .filter(Boolean),
   getDesertTiles: () => [...state.desertTiles].map(parseKey),
   getToxicTiles: () => [...state.toxicTiles].map(parseKey),
+  getFertileTiles: () => [...state.fertileTiles].map(parseKey),
   getPoisonTiles: () => [...state.toxicTiles].map(parseKey),
   getScarecrowTiles: () => [...state.scarecrowTiles].map(parseKey),
   getGalePotionActive: () => state.galePotionActive,
@@ -6343,6 +7033,7 @@ renderPanLockButton();
 renderStatsPanel();
 renderBoostPotionButton();
 renderLayoutSlots();
+renderFriendImportPreview();
 renderRecipeCalculator();
 renderMaterialCalculator();
 initializeTimeCalculatorData();
