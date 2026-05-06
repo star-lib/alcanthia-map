@@ -310,6 +310,7 @@ const CROP_TO_PLANT_ID = {
   "sunset-tree": "sunset_bush",
   "sun-flower": "sunlight_flower",
 };
+const plantIdToCropId = new Map(Object.entries(CROP_TO_PLANT_ID).map(([cropId, plantId]) => [plantId, cropId]));
 const PLANT_SPECS = {
   herb: { growTimeMs: 10000, waterIntervalMs: Number.POSITIVE_INFINITY, maxHarvests: 1, produce: { intervalMs: 1 } },
   red_flower: { growTimeMs: 10000, waterIntervalMs: 20000, maxHarvests: 500, produce: { intervalMs: 15000 } },
@@ -543,10 +544,29 @@ slotPanel.innerHTML = `
     <h3>밭 저장하기</h3>
     <p>최대 10개 저장</p>
   </div>
+  <section id="friend-import-panel" class="friend-import-panel" hidden>
+    <div class="friend-import-copy">
+      <strong>공개 밭 불러오기</strong>
+      <p>닉네임으로 공개된 밭과 스킬 투자 정보를 가져옵니다.</p>
+    </div>
+    <div class="friend-import-controls">
+      <label class="field field-wide">
+        <span>닉네임</span>
+        <input id="friend-nickname-input" type="text" maxlength="20" placeholder="예: 별빛도서관" />
+      </label>
+      <button id="friend-import-button" class="slot-action-button" type="button">불러오기</button>
+    </div>
+    <p id="friend-import-note" class="friend-import-note">
+      공개 상태인 유저만 불러올 수 있으며 최신 정보는 프록시를 통해 조회합니다.
+    </p>
+  </section>
   <div id="slot-list" class="slot-list"></div>
 `;
 plannerCard.insertBefore(slotPanel, siteNote);
 const slotList = document.getElementById("slot-list");
+const friendImportPanel = document.getElementById("friend-import-panel");
+const friendNicknameInput = document.getElementById("friend-nickname-input");
+const friendImportButton = document.getElementById("friend-import-button");
 slotPanel.classList.add("slot-modal");
 const slotPanelCloseButton = document.createElement("button");
 slotPanelCloseButton.type = "button";
@@ -617,7 +637,7 @@ openCauldronSlotsButton.textContent = "저장/불러오기";
 cauldronBoard.before(openCauldronSlotsButton);
 
 const STORAGE_KEY = "alchansia-layout-v1";
-const LAYOUT_VERSION = 2;
+const LAYOUT_VERSION = 3;
 const SLOT_STORAGE_KEY = "alchansia-layout-slots-v1";
 const CALCULATOR_STORAGE_KEY = "alchansia-calculator-v1";
 const MATERIAL_STORAGE_KEY = "alchansia-materials-v1";
@@ -625,6 +645,7 @@ const CAULDRON_SLOT_STORAGE_KEY = "alchansia-cauldron-slots-v1";
 const TIME_CALCULATOR_STORAGE_KEY = "alchansia-time-calculator-v1";
 const SKILL_TREE_STORAGE_KEY = "alchansia-skill-tree-v1";
 const SKILL_POINT_STORAGE_KEY = "alchansia-skill-points-v1";
+const FRIEND_PROFILE_PROXY_ENDPOINT = "https://alcanthia-farm-proxy.sh95-game.workers.dev/";
 const TIME_RELEVANT_SKILL_KEYS = {
   flameMastery: "불꽃 숙련",
 };
@@ -781,6 +802,7 @@ const state = {
   plants: new Map(),
   desertTiles: new Set(),
   toxicTiles: new Set(),
+  fertileTiles: new Set(),
   scarecrowTiles: new Set(),
   galePotionActive: false,
   layoutSlots: Array.from({ length: MAX_LAYOUT_SLOTS }, () => null),
@@ -947,6 +969,9 @@ function basePlannerCellConditions(key) {
   if (state.toxicTiles.has(key)) {
     conditions.push("toxic");
   }
+  if (state.fertileTiles.has(key)) {
+    conditions.push("fertile");
+  }
   return conditions;
 }
 
@@ -966,8 +991,10 @@ function currentLayoutPayload() {
       .filter((entry) => entry[1]),
     desertTiles: [...state.desertTiles],
     toxicTiles: [...state.toxicTiles],
+    fertileTiles: [...state.fertileTiles],
     scarecrowTiles: [...state.scarecrowTiles],
     galePotionActive: state.galePotionActive,
+    boostPotionActive: state.boostPotionActive,
     selectedCropId: state.selectedCropId,
     selectedCropEnhancement: clampEnhancementLevel(state.selectedCropEnhancement),
   };
@@ -1042,6 +1069,7 @@ function migrateLegacyLayoutPayload(payload) {
     poisonTiles: migrateKeyArray(
       Array.isArray(payload.poisonTiles) ? payload.poisonTiles : payload.toxicTiles,
     ),
+    fertileTiles: migrateKeyArray(payload.fertileTiles),
     scarecrowTiles: migrateKeyArray(payload.scarecrowTiles),
   };
 }
@@ -1078,6 +1106,11 @@ function applyLayoutPayload(payload) {
   const toxicTiles = new Set(
     toxicTileSource.filter((value) => typeof value === "string"),
   );
+  const fertileTiles = new Set(
+    Array.isArray(normalizedPayload?.fertileTiles)
+      ? normalizedPayload.fertileTiles.filter((value) => typeof value === "string")
+      : [],
+  );
   const scarecrowTiles = new Set(
     Array.isArray(normalizedPayload?.scarecrowTiles)
       ? normalizedPayload.scarecrowTiles.filter((value) => typeof value === "string")
@@ -1087,8 +1120,10 @@ function applyLayoutPayload(payload) {
   state.plants = new Map([...plants].filter(([key]) => state.cells.has(key)));
   state.desertTiles = new Set([...desertTiles].filter((key) => state.cells.has(key)));
   state.toxicTiles = new Set([...toxicTiles].filter((key) => state.cells.has(key)));
+  state.fertileTiles = new Set([...fertileTiles].filter((key) => state.cells.has(key)));
   state.scarecrowTiles = new Set([...scarecrowTiles].filter((key) => state.cells.has(key)));
   state.galePotionActive = Boolean(normalizedPayload?.galePotionActive);
+  state.boostPotionActive = Boolean(normalizedPayload?.boostPotionActive);
 
   if (cropById.has(normalizedPayload?.selectedCropId)) {
     state.selectedCropId = normalizedPayload.selectedCropId;
@@ -1112,6 +1147,158 @@ function decodeLayoutPayload(encoded) {
   const binary = atob(normalized + padding);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function remoteOrnamentIsScarecrow(ornament) {
+  const key = String(
+    ornament?.itemCode
+    ?? ornament?.id
+    ?? ornament?.itemKey
+    ?? "",
+  ).toLowerCase();
+  return key.includes("scarecrow");
+}
+
+function layoutPayloadFromFriendProfile(profile) {
+  if (!Array.isArray(profile?.grid)) {
+    throw new Error("공개 밭 데이터에 grid 정보가 없습니다.");
+  }
+
+  const remoteCells = [];
+  profile.grid.forEach((row, rowIndex) => {
+    if (!Array.isArray(row)) {
+      return;
+    }
+    row.forEach((cell, colIndex) => {
+      if (cell) {
+        remoteCells.push({ row: rowIndex, col: colIndex, cell });
+      }
+    });
+  });
+
+  if (!remoteCells.length) {
+    throw new Error("공개 밭에 표시할 칸이 없습니다.");
+  }
+
+  const minCol = Math.min(...remoteCells.map((entry) => entry.col));
+  const maxCol = Math.max(...remoteCells.map((entry) => entry.col));
+  const minRow = Math.min(...remoteCells.map((entry) => entry.row));
+  const maxRow = Math.max(...remoteCells.map((entry) => entry.row));
+  const colOffset = CENTER_CELL.col - Math.round((minCol + maxCol) / 2);
+  const rowOffset = CENTER_CELL.row - Math.round((minRow + maxRow) / 2);
+
+  const cells = new Set();
+  const plants = [];
+  const desertTiles = new Set();
+  const toxicTiles = new Set();
+  const fertileTiles = new Set();
+  const scarecrowTiles = new Set();
+
+  remoteCells.forEach(({ row, col, cell }) => {
+    const localKey = cellKey(col + colOffset, row + rowOffset);
+    cells.add(localKey);
+
+    const conditions = Array.isArray(cell?.conditions) ? cell.conditions : [];
+    if (conditions.includes("arid")) {
+      desertTiles.add(localKey);
+    }
+    if (conditions.includes("toxic")) {
+      toxicTiles.add(localKey);
+    }
+    if (conditions.includes("fertile")) {
+      fertileTiles.add(localKey);
+    }
+
+    if (remoteOrnamentIsScarecrow(cell?.ornament)) {
+      scarecrowTiles.add(localKey);
+    }
+
+    const cropId = plantIdToCropId.get(cell?.plant?.id);
+    if (cropId) {
+      plants.push([
+        localKey,
+        {
+          cropId,
+          enhancement: clampEnhancementLevel(cell.plant.enhancement),
+        },
+      ]);
+    }
+  });
+
+  const activeEffects = Array.isArray(profile?.effects) ? profile.effects : [];
+  return {
+    layoutVersion: LAYOUT_VERSION,
+    cells: [...cells],
+    plants,
+    desertTiles: [...desertTiles],
+    toxicTiles: [...toxicTiles],
+    fertileTiles: [...fertileTiles],
+    scarecrowTiles: [...scarecrowTiles].filter((key) => !plants.some(([plantKey]) => plantKey === key)),
+    galePotionActive: activeEffects.some((effect) => effect?.itemCode === "gale_potion"),
+    boostPotionActive: activeEffects.some((effect) => effect?.itemCode === "red_essence"),
+    selectedCropId: state.selectedCropId,
+    selectedCropEnhancement: selectedCropEnhancementLevel(),
+  };
+}
+
+function applyFriendSkillProfile(profile) {
+  const spellLevels = profile?.spellLevels && typeof profile.spellLevels === "object"
+    ? profile.spellLevels
+    : {};
+  state.skillLevels = new Map(
+    Object.entries(spellLevels)
+      .filter(([, level]) => Number(level) > 0)
+      .map(([key, level]) => [key, Number(level)]),
+  );
+  state.selectedSkillKey = "";
+  if (!state.activeSkillCategory) {
+    state.activeSkillCategory = skillCategories()[0] ?? "";
+  }
+}
+
+async function importFriendProfileByNickname(nickname) {
+  const trimmedNickname = String(nickname ?? "").trim();
+  if (!trimmedNickname) {
+    throw new Error("닉네임을 입력해 주세요.");
+  }
+
+  const endpoint = new URL(FRIEND_PROFILE_PROXY_ENDPOINT);
+  endpoint.searchParams.set("nickname", trimmedNickname);
+
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.ok || !payload?.profile) {
+    const message = typeof payload?.error === "string"
+      ? payload.error
+      : `공개 밭 조회 실패 (${response.status})`;
+    throw new Error(message);
+  }
+  const profile = payload.profile;
+  if (!Array.isArray(profile.grid)) {
+    const message = typeof profile?.raw?.error === "string"
+      ? profile.raw.error
+      : "공개 밭 데이터를 읽지 못했습니다.";
+    throw new Error(message);
+  }
+
+  applyLayoutPayload(layoutPayloadFromFriendProfile(profile));
+  applyFriendSkillProfile(profile);
+  saveLayoutToStorage();
+  saveSkillTreeToStorage();
+  renderPalette();
+  renderBoostPotionButton();
+  renderSkillTree();
+  renderSkillPointCalculator();
+  centerView();
+  return {
+    nickname: profile?.nickname ?? payload?.nickname ?? trimmedNickname,
+    theme: profile?.activeTheme ?? "default",
+    effects: Array.isArray(profile?.effects) ? profile.effects.length : 0,
+  };
 }
 
 function currentShareUrl() {
@@ -1444,6 +1631,9 @@ function openSlotModal(mode) {
   renderLayoutSlots();
   slotPanel.hidden = false;
   slotModalBackdrop.hidden = false;
+  if (state.activeSlotMode === "layout") {
+    friendNicknameInput?.focus();
+  }
 }
 
 function closeSlotModal() {
@@ -1460,6 +1650,9 @@ function renderLayoutSlots() {
   }
   if (description) {
     description.textContent = "최대 10개 저장";
+  }
+  if (friendImportPanel) {
+    friendImportPanel.hidden = state.activeSlotMode !== "layout";
   }
 
   slotList.innerHTML = "";
@@ -3971,6 +4164,7 @@ function plannerSimulationCacheKey() {
     plants: [...state.plants.entries()].sort((a, b) => a[0].localeCompare(b[0])),
     desertTiles: [...state.desertTiles].sort(),
     toxicTiles: [...state.toxicTiles].sort(),
+    fertileTiles: [...state.fertileTiles].sort(),
     scarecrowTiles: [...state.scarecrowTiles].sort(),
     galePotionActive: state.galePotionActive,
     boostPotionActive: state.boostPotionActive,
@@ -4478,6 +4672,7 @@ function buildPlannerAnalysis() {
     effects.set(cell.key, {
       watered: cell.conditions.includes("humid") ? 1 : 0,
       toxic: cell.conditions.includes("toxic") ? 1 : 0,
+      fertile: cell.conditions.includes("fertile") ? 1 : 0,
       poisoned: cell.conditions.includes("poisonous") || cell.plant?.conditions.includes("poisoned") ? 1 : 0,
       sunBuff: cell.conditions.includes("sunlit") ? 1 : 0,
       scarecrow: state.scarecrowTiles.has(cell.key) ? 1 : 0,
@@ -4641,6 +4836,7 @@ function buildEffectMap() {
     effects.set(cell.key, {
       watered: 0,
       toxic: cell.conditions.includes("toxic") ? 1 : 0,
+      fertile: cell.conditions.includes("fertile") ? 1 : 0,
       poisoned: 0,
       sunBuff: 0,
       scarecrow: state.scarecrowTiles.has(cell.key) ? 1 : 0,
@@ -4836,6 +5032,16 @@ function drawEffectOverlay(points, effect) {
       stripe: "#9b69e6",
       lineWidth: 1.6,
       stripeSpacing: 10,
+    });
+  }
+
+  if (effect.fertile > 0) {
+    drawStripedDiamond(points, {
+      fill: "rgba(201, 240, 154, 0.34)",
+      stroke: "#6f9c32",
+      stripe: "#a5cd5f",
+      lineWidth: 1.3,
+      stripeSpacing: 12,
     });
   }
 
@@ -5873,6 +6079,7 @@ function applyClick(point) {
     state.plants.delete(cell.key);
     state.desertTiles.delete(cell.key);
     state.toxicTiles.delete(cell.key);
+    state.fertileTiles.delete(cell.key);
     state.scarecrowTiles.delete(cell.key);
     if (state.cells.size === 0) {
       state.cells = createStartingCells();
@@ -6079,6 +6286,8 @@ canvas.addEventListener("contextmenu", (event) => {
   state.plants.delete(cell.key);
   state.desertTiles.delete(cell.key);
   state.toxicTiles.delete(cell.key);
+  state.fertileTiles.delete(cell.key);
+  state.scarecrowTiles.delete(cell.key);
 
   for (const [key] of state.plants) {
     if (!state.cells.has(key)) {
@@ -6100,8 +6309,10 @@ clearCropsButton.addEventListener("click", () => {
   state.plants.clear();
   state.desertTiles.clear();
   state.toxicTiles.clear();
+  state.fertileTiles.clear();
   state.scarecrowTiles.clear();
   state.galePotionActive = false;
+  state.boostPotionActive = false;
   saveLayoutToStorage();
   draw();
 });
@@ -6118,6 +6329,28 @@ openLayoutSlotsButton.addEventListener("click", () => {
 
 openCauldronSlotsButton.addEventListener("click", () => {
   openSlotModal("cauldron");
+});
+
+friendImportButton?.addEventListener("click", async () => {
+  const nickname = friendNicknameInput?.value ?? "";
+  friendImportButton.disabled = true;
+  try {
+    const result = await importFriendProfileByNickname(nickname);
+    closeSlotModal();
+    showCopyFeedback(`${result.nickname} 공개 밭을 불러왔습니다.`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "공개 밭을 불러오지 못했습니다.";
+    showCopyFeedback(message, true);
+  } finally {
+    friendImportButton.disabled = false;
+  }
+});
+
+friendNicknameInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    friendImportButton?.click();
+  }
 });
 
 slotModalBackdrop.addEventListener("click", closeSlotModal);
@@ -6334,8 +6567,10 @@ resetButton.addEventListener("click", () => {
   state.plants.clear();
   state.desertTiles.clear();
   state.toxicTiles.clear();
+  state.fertileTiles.clear();
   state.scarecrowTiles.clear();
   state.galePotionActive = false;
+  state.boostPotionActive = false;
   state.hover = null;
   state.hoverPoint = null;
   saveLayoutToStorage();
@@ -6365,9 +6600,11 @@ window.render_game_to_text = () =>
       .filter(Boolean),
     desertTiles: [...state.desertTiles].map(parseKey),
     toxicTiles: [...state.toxicTiles].map(parseKey),
+    fertileTiles: [...state.fertileTiles].map(parseKey),
     poisonTiles: [...state.toxicTiles].map(parseKey),
     scarecrowTiles: [...state.scarecrowTiles].map(parseKey),
     galePotionActive: state.galePotionActive,
+    boostPotionActive: state.boostPotionActive,
     expandableSlots: state.addSlots,
     skillCategory: state.activeSkillCategory,
     skillPointsSpent: skillPointTotals(),
@@ -6396,6 +6633,7 @@ window.__planner_debug = {
       .filter(Boolean),
   getDesertTiles: () => [...state.desertTiles].map(parseKey),
   getToxicTiles: () => [...state.toxicTiles].map(parseKey),
+  getFertileTiles: () => [...state.fertileTiles].map(parseKey),
   getPoisonTiles: () => [...state.toxicTiles].map(parseKey),
   getScarecrowTiles: () => [...state.scarecrowTiles].map(parseKey),
   getGalePotionActive: () => state.galePotionActive,

@@ -634,6 +634,40 @@ body {
   font-size: 0.9rem;
 }
 
+.friend-import-panel {
+  margin-bottom: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(92, 66, 37, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.friend-import-copy strong,
+.friend-import-copy p {
+  margin: 0;
+}
+
+.friend-import-copy p {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.friend-import-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.friend-import-note {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .slot-list {
   display: grid;
   gap: 10px;
@@ -2048,6 +2082,10 @@ body {
   }
 
   .slot-row {
+    grid-template-columns: 1fr;
+  }
+
+  .friend-import-controls {
     grid-template-columns: 1fr;
   }
 
